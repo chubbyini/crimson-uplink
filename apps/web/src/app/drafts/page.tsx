@@ -74,6 +74,18 @@ export default function DraftsPage() {
 
   const [publishing, setPublishing] = useState<string | null>(null);
   const [pubUrls, setPubUrls] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState("");
+
+  async function saveEdit(id: string) {
+    if (!user || !db) return;
+    await updateDoc(doc(db, "users", user.uid, "drafts", id), {
+      body: editBody,
+      editedAt: new Date().toISOString(),
+    });
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, body: editBody } : r)));
+    setEditing(null);
+  }
 
   async function publishDevto(id: string) {
     if (!user) return;
@@ -155,10 +167,34 @@ export default function DraftsPage() {
             >
               {open === d.id ? "Hide" : "Preview"}
             </button>
-            {open === d.id && (
-              <pre className="mt-2 max-h-96 overflow-auto rounded-xl bg-black/5 p-3 text-sm whitespace-pre-wrap dark:bg-white/5">
+            {open === d.id && editing !== d.id && (
+              <pre className="mt-2 max-h-96 overflow-auto rounded-xl bg-black/5 p-3 text-sm whitespace-pre-wrap text-slate-800 dark:bg-white/5 dark:text-slate-100">
                 {d.body}
               </pre>
+            )}
+            {editing === d.id && (
+              <div className="mt-2">
+                <textarea
+                  rows={12}
+                  value={editBody}
+                  onChange={(e) => setEditBody(e.target.value)}
+                  className="w-full rounded-xl border border-black/10 bg-white p-3 text-sm text-black dark:border-white/15 dark:bg-zinc-950 dark:text-zinc-100"
+                />
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => saveEdit(d.id)}
+                    className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-800"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditing(null)}
+                    className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
               <button
@@ -167,6 +203,18 @@ export default function DraftsPage() {
               >
                 {copied === d.id ? "Copied ✓" : "Copy text"}
               </button>
+              {(d.status === "pending_review" || d.status === "approved") && editing !== d.id && (
+                <button
+                  onClick={() => {
+                    setEditBody(d.body);
+                    setEditing(d.id);
+                    setOpen(d.id);
+                  }}
+                  className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
+                >
+                  Edit
+                </button>
+              )}
               {d.status === "pending_review" && (
                 <>
                   <button
