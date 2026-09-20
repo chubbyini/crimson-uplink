@@ -1,4 +1,5 @@
 import Link from "next/link";
+import CarmineTitle from "@/components/CarmineTitle";
 import ThemedTextFrame from "@/components/ThemedTextFrame";
 import PipelineVisualizer from "@/components/PipelineVisualizer";
 import BioMechSimulator from "@/components/BioMechSimulator";
@@ -12,19 +13,23 @@ export default function Home() {
         
         {/* HERO SECTION - SEAMLESS WITH BACKGROUND WARSHIP & VEINS */}
         <section className="relative text-center space-y-6 pt-4">
-        
+          {/* Tactical Engine Badge */}
+          <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-slate-900/80 px-4 py-1.5 font-mono text-xs font-bold text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.15)]">
+            <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse" />
+            AUTONOMOUS CONTENT ENGINE // CRON READY
+          </div>
 
-          {/* Main Title with Themed SVG Surrounding Frame (No Gradient) */}
+          {/* Main Title with Carmine (lightning crawling on E) and Celestial Solar System O */}
           <h1 className="text-4xl font-black tracking-tight text-white sm:text-6xl md:text-7xl leading-tight">
-            CARMINE<br className="hidden sm:inline" />
-            <ThemedTextFrame text="CONTENT AUTOMATION" />
+            <CarmineTitle /> <br className="hidden sm:inline" />
+            <ThemedTextFrame />
           </h1>
 
           {/* Subtitle */}
           <p className="mx-auto max-w-2xl text-base text-slate-300 sm:text-lg leading-relaxed font-normal">
             Harvest morning developer trends, score viral angles with{" "}
-            <strong className="text-sky-300 font-semibold">Gemini 2.0 Flash Lite</strong>, synthesize drafts in your voice with{" "}
-            <strong className="text-rose-400 font-semibold">Groq Llama 3.3</strong>, and approve directly on your phone via{" "}
+            <strong className="text-sky-300 font-semibold">Gemini 3.5 Flash Lite</strong>, synthesize drafts in your voice with{" "}
+            <strong className="text-rose-400 font-semibold">Groq GPT-OSS 120B</strong>, and approve directly on your phone via{" "}
             <strong className="text-white font-semibold">Telegram</strong>.
           </p>
 

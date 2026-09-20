@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import { emptySettings, type Settings } from "@/lib/settings";
@@ -300,7 +301,15 @@ export default function SettingsPage() {
         {ingest && (
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
             Fetched {ingest.fetched} · unique {ingest.unique} · added{" "}
-            {ingest.added} · seen before {ingest.seenBefore}.
+            {ingest.added} · seen before {ingest.seenBefore}. Next:{" "}
+            <Link href="/items" className="underline">
+              browse articles
+            </Link>{" "}
+            or{" "}
+            <Link href="/ideas" className="underline">
+              score ideas
+            </Link>
+            .
           </p>
         )}
       </section>

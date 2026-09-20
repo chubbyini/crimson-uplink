@@ -28,6 +28,7 @@ export default function IdeasPage() {
   const [status, setStatus] = useState<"idle" | "loading" | "scoring" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [drafting, setDrafting] = useState<string | null>(null);
+  const [tg, setTg] = useState<null | { sent: boolean; reason?: string }>(null);
 
   async function load(u: User) {
     if (!db) return;
@@ -68,6 +69,7 @@ export default function IdeasPage() {
     if (!user) return;
     setStatus("scoring");
     setError(null);
+    setTg(null);
     try {
       const token = await user.getIdToken();
       const res = await fetch("/api/ideas", {
@@ -76,6 +78,7 @@ export default function IdeasPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Scoring failed");
+      setTg(data.telegram ?? null);
       await load(user);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scoring failed");
@@ -119,6 +122,15 @@ export default function IdeasPage() {
         </button>
       </div>
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {tg && (
+        <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+          {tg.sent ? (
+            <>Digest sent to Telegram ✓ — approve from your phone or below.</>
+          ) : (
+            <>Telegram digest not sent ({tg.reason ?? "not configured"}). You can still approve below.</>
+          )}
+        </p>
+      )}
       <div className="mt-4 flex gap-2">
         {filters.map((f) => (
           <button

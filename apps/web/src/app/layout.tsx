@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import AuthButton from "@/components/AuthButton";
+import { DesktopNav, MobileNav } from "@/components/NavLinks";
 import CrimsonVeins from "@/components/CrimsonVeins";
 import BackgroundWarship from "@/components/BackgroundWarship";
 import CrimsonLightningBackground from "@/components/CrimsonLightningBackground";
@@ -67,44 +68,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           <div className="flex items-center gap-4">
-            <nav className="hidden sm:flex items-center gap-4 font-mono text-xs font-medium">
-              <Link
-                href="/items"
-                className="text-slate-400 hover:text-sky-400 transition-colors"
-              >
-                SOURCES
-              </Link>
-              <Link
-                href="/ideas"
-                className="text-slate-400 hover:text-sky-400 transition-colors"
-              >
-                IDEAS
-              </Link>
-              <Link
-                href="/drafts"
-                className="text-slate-400 hover:text-sky-400 transition-colors"
-              >
-                DRAFTS
-              </Link>
-              <Link
-                href="/settings"
-                className="text-slate-400 hover:text-sky-400 transition-colors"
-              >
-                SETTINGS
-              </Link>
-              <Link
-                href="/analytics"
-                className="text-slate-400 hover:text-sky-400 transition-colors"
-              >
-                ANALYTICS
-              </Link>
-            </nav>
+            <DesktopNav />
             <AuthButton />
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <div className="relative z-10 flex-1">{children}</div>
+        {/* Main Content Area (bottom padding clears the mobile nav) */}
+        <div className="relative z-10 flex-1 pb-16 sm:pb-0">{children}</div>
+        <MobileNav />
 
         {/* Tactical Footer */}
         <footer className="relative z-10 border-t border-slate-800 bg-slate-950/90 py-6 px-6 text-center font-mono text-xs text-slate-500">
@@ -113,7 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               CRIMSON UPLINK // PRECISION CONTENT AUTOMATION ENGINE
             </p>
             <p className="text-[11px] text-slate-600">
-              BYOK ARCHITECTURE • GROQ LLAMA-3.3 70B • GEMINI 2.0 FLASH LITE
+              BYOK ARCHITECTURE • GROQ GPT-OSS 120B • GEMINI 3.5 FLASH LITE
             </p>
           </div>
         </footer>
