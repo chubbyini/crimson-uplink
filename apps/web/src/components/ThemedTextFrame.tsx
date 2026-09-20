@@ -5,10 +5,10 @@ import CelestialO from "./CelestialO";
 
 export default function ThemedTextFrame() {
   return (
-    <span className="relative inline-block my-1 px-4 py-1 sm:px-6 sm:py-2">
+    <span className="relative inline-block max-w-full my-1 px-3 py-1 sm:px-6 sm:py-2">
       {/* Surrounding Themed SVG Matrix */}
       <svg
-        className="pointer-events-none absolute inset-0 -m-1 h-[calc(100%+8px)] w-[calc(100%+8px)] overflow-visible"
+        className="pointer-events-none absolute inset-0 -m-1 h-[calc(100%+8px)] w-[calc(100%+8px)]"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
@@ -30,7 +30,7 @@ export default function ThemedTextFrame() {
 
         {/* Animated Horizontal Bounding Traces (Top & Bottom) */}
         <line
-          x1="20"
+          x1="16"
           y1="2"
           x2="95%"
           y2="2"
@@ -43,7 +43,7 @@ export default function ThemedTextFrame() {
         <line
           x1="5%"
           y1="98%"
-          x2="85%"
+          x2="88%"
           y2="98%"
           stroke="url(#frameLineGrad)"
           strokeWidth="1.2"
@@ -57,65 +57,66 @@ export default function ThemedTextFrame() {
         {/* Top-Left Corner (Cyan) */}
         <g filter="url(#frameGlow)">
           <path
-            d="M 0 16 L 0 0 L 22 0"
+            d="M 0 14 L 0 0 L 18 0"
             stroke="#38bdf8"
             strokeWidth="2"
             strokeLinecap="square"
           />
-          <circle cx="0" cy="0" r="2.5" fill="#38bdf8" className="animate-pulse" />
+          <circle cx="0" cy="0" r="2" fill="#38bdf8" className="animate-pulse" />
         </g>
 
         {/* Top-Right Corner (Crimson) */}
         <g filter="url(#frameGlow)">
           <path
-            d="M calc(100% - 22px) 0 L 100% 0 L 100% 16"
+            d="M calc(100% - 18px) 0 L 100% 0 L 100% 14"
             stroke="#ff2a55"
             strokeWidth="2"
             strokeLinecap="square"
           />
-          <circle cx="100%" cy="0" r="2.5" fill="#ff2a55" className="animate-pulse" />
+          <circle cx="100%" cy="0" r="2" fill="#ff2a55" className="animate-pulse" />
         </g>
 
         {/* Bottom-Left Corner (Crimson) */}
         <g filter="url(#frameGlow)">
           <path
-            d="M 0 calc(100% - 16px) L 0 100% L 22 100%"
+            d="M 0 calc(100% - 14px) L 0 100% L 18 100%"
             stroke="#ff2a55"
             strokeWidth="2"
             strokeLinecap="square"
           />
-          <circle cx="0" cy="100%" r="2.5" fill="#ff2a55" className="animate-pulse" />
+          <circle cx="0" cy="100%" r="2" fill="#ff2a55" className="animate-pulse" />
         </g>
 
         {/* Bottom-Right Corner (Cyan) */}
         <g filter="url(#frameGlow)">
           <path
-            d="M calc(100% - 22px) 100% L 100% 100% L 100% calc(100% - 16px)"
+            d="M calc(100% - 18px) 100% L 100% 100% L 100% calc(100% - 14px)"
             stroke="#38bdf8"
             strokeWidth="2"
             strokeLinecap="square"
           />
-          <circle cx="100%" cy="100%" r="2.5" fill="#38bdf8" className="animate-pulse" />
-        </g>
-
-        {/* Micro-Crosshair Center Flanks */}
-        <g opacity="0.6">
-          <line x1="-8" y1="50%" x2="-2" y2="50%" stroke="#38bdf8" strokeWidth="1.2" />
-          <line x1="-5" y1="calc(50% - 3px)" x2="-5" y2="calc(50% + 3px)" stroke="#38bdf8" strokeWidth="1.2" />
-          <line x1="calc(100% + 2px)" y1="50%" x2="calc(100% + 8px)" y2="50%" stroke="#ff2a55" strokeWidth="1.2" />
-          <line x1="calc(100% + 5px)" y1="calc(50% - 3px)" x2="calc(100% + 5px)" y2="calc(50% + 3px)" stroke="#ff2a55" strokeWidth="1.2" />
+          <circle cx="100%" cy="100%" r="2" fill="#38bdf8" className="animate-pulse" />
         </g>
       </svg>
 
-      {/* Solid Non-Gradient Text with the Animated Celestial Solar System O */}
-      <span className="relative z-10 inline-flex items-center font-black tracking-tight text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]">
-        <span>C</span>
-        <CelestialO />
-        <span>NTENT&nbsp;AUT</span>
-        <CelestialO />
-        <span>MATI</span>
-        <CelestialO />
-        <span>N</span>
+      {/* Solid Non-Gradient Text - Fully Responsive: Wraps cleanly on mobile without overflow */}
+      <span
+        aria-label="CONTENT AUTOMATION"
+        className="relative z-10 flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-4 gap-y-1 font-black tracking-tight text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.2)] max-w-full"
+      >
+        {/* Word 1: CONTENT */}
+        <span className="inline-flex items-center">
+          <span>C</span>
+          <CelestialO />
+          <span>NTENT</span>
+        </span>
+
+        {/* Word 2: AUTOMATION */}
+        <span className="inline-flex items-center">
+          <span>AUT</span>
+          <CelestialO />
+          <span>MATION</span>
+        </span>
       </span>
     </span>
   );

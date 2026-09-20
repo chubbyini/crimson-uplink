@@ -3,10 +3,11 @@
 import React, { useEffect, useState } from "react";
 
 export default function BackgroundWarship() {
-  // Phase 0: Fully Solid Spacecraft
+  // Phase 0: Solid Spacecraft
   // Phase 1: Disintegrating into Quantum Particle Cloud
   // Phase 2: Quantum Particles Converging & Re-integrating
   const [phase, setPhase] = useState<number>(0);
+  const [imageError, setImageError] = useState<boolean>(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -37,31 +38,53 @@ export default function BackgroundWarship() {
   });
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-6 z-0 flex justify-center overflow-hidden opacity-55">
+    <div className="pointer-events-none fixed inset-x-0 top-6 -z-10 flex justify-center overflow-hidden opacity-55">
       <div className="relative w-[850px] lg:w-[1050px] h-[360px] lg:h-[450px]">
-        {/* Realistic 3D Stylized Spacecraft Asset with Radial Fade Mask */}
-        <div
-          className="absolute inset-0 transition-all duration-1000 ease-in-out"
-          style={{
-            opacity: phase === 0 ? 0.95 : phase === 1 ? 0.08 : 0.55,
-            transform:
-              phase === 0
-                ? "scale(1) translateY(0px)"
-                : phase === 1
-                ? "scale(0.94) translateY(6px)"
-                : "scale(0.98) translateY(2px)",
-            filter: phase === 1 ? "blur(4px) drop-shadow(0 0 20px #ff2a55)" : "drop-shadow(0 0 25px rgba(56,189,248,0.25))",
-            maskImage: "radial-gradient(ellipse 75% 65% at 50% 50%, black 40%, transparent 85%)",
-            WebkitMaskImage: "radial-gradient(ellipse 75% 65% at 50% 50%, black 40%, transparent 85%)",
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/spacecraft.jpg"
-            alt="Stylized Battlecruiser"
-            className="w-full h-full object-cover object-center mix-blend-lighten"
-          />
-        </div>
+        {/* Realistic 3D Stylized Spacecraft Asset (with SVG Fallback if Image Fails or is Slow) */}
+        {!imageError ? (
+          <div
+            className="absolute inset-0 transition-all duration-1000 ease-in-out"
+            style={{
+              opacity: phase === 0 ? 0.95 : phase === 1 ? 0.08 : 0.55,
+              transform:
+                phase === 0
+                  ? "scale(1) translateY(0px)"
+                  : phase === 1
+                  ? "scale(0.94) translateY(6px)"
+                  : "scale(0.98) translateY(2px)",
+              filter: phase === 1 ? "blur(4px) drop-shadow(0 0 20px #ff2a55)" : "drop-shadow(0 0 25px rgba(56,189,248,0.25))",
+              maskImage: "radial-gradient(ellipse 75% 65% at 50% 50%, black 40%, transparent 85%)",
+              WebkitMaskImage: "radial-gradient(ellipse 75% 65% at 50% 50%, black 40%, transparent 85%)",
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/spacecraft.jpg"
+              alt=""
+              aria-hidden="true"
+              onError={() => setImageError(true)}
+              className="w-full h-full object-cover object-center mix-blend-lighten"
+            />
+          </div>
+        ) : (
+          /* SVG Vector Wireframe Spacecraft Fallback */
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none transition-all duration-1000 ease-in-out"
+            viewBox="0 0 1000 360"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{
+              opacity: phase === 0 ? 0.7 : phase === 1 ? 0.08 : 0.4,
+              transform: phase === 0 ? "scale(1)" : phase === 1 ? "scale(0.92)" : "scale(0.96)",
+            }}
+          >
+            <polygon points="880,180 720,130 720,230" fill="#0f172a" stroke="#38bdf8" strokeWidth="1.6" />
+            <polygon points="720,130 460,105 280,140 280,220 460,255 720,230" fill="#090d16" stroke="#38bdf8" strokeWidth="1.6" />
+            <polygon points="460,105 360,50 280,95" fill="#0f172a" stroke="#ff2a55" strokeWidth="1.4" />
+            <polygon points="460,255 360,310 280,265" fill="#0f172a" stroke="#ff2a55" strokeWidth="1.4" />
+            <line x1="280" y1="180" x2="880" y2="180" stroke="#38bdf8" strokeWidth="1" strokeDasharray="6 6" />
+          </svg>
+        )}
 
         {/* SVG Quantum Disintegration Overlay */}
         <svg
@@ -101,7 +124,7 @@ export default function BackgroundWarship() {
                   ? "translate(0px, 0px) scale(0)"
                   : phase === 1
                   ? `translate(${p.dx}px, ${p.dy}px) scale(1.8)`
-                  : `translate(${parseFloat(p.dx) * 0.3}px, ${parseFloat(p.dy) * 0.3}px) scale(0.9)`;
+                  : `translate(${parseFloat(p.dx) * 0.35}px, ${parseFloat(p.dy) * 0.35}px) scale(1)`;
 
               const currentOpacity = phase === 0 ? 0 : phase === 1 ? 0.95 : 0.4;
 

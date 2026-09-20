@@ -1,10 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import Dashboard from "@/components/Dashboard";
 import CarmineTitle from "@/components/CarmineTitle";
 import ThemedTextFrame from "@/components/ThemedTextFrame";
 import PipelineVisualizer from "@/components/PipelineVisualizer";
@@ -12,38 +6,38 @@ import BioMechSimulator from "@/components/BioMechSimulator";
 import MechDesignerStats from "@/components/MechDesignerStats";
 import VoiceMatrixCard from "@/components/VoiceMatrixCard";
 
-export function Landing() {
+export default function Home() {
   return (
-    <main className="flex w-full flex-col items-center px-4 py-12 sm:px-8 md:py-20">
-      <div className="w-full max-w-6xl space-y-16">
+    <main className="flex w-full flex-col items-center px-3 py-8 sm:px-8 md:py-16 overflow-x-hidden">
+      <div className="w-full max-w-6xl space-y-12 sm:space-y-16">
         
-        {/* HERO SECTION - SEAMLESS WITH BACKGROUND WARSHIP & VEINS */}
-        <section className="relative text-center space-y-6 pt-4">
+        {/* HERO SECTION - GUARANTEED TEXT VISIBILITY OVER BACKGROUND */}
+        <section className="relative z-20 text-center space-y-5 sm:space-y-6 pt-2 sm:pt-4">
           {/* Tactical Engine Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-slate-900/80 px-4 py-1.5 font-mono text-xs font-bold text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.15)]">
-            <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse" />
-            AUTONOMOUS CONTENT ENGINE // CRON READY
+          <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-slate-900/80 px-3 py-1 sm:px-4 sm:py-1.5 font-mono text-[11px] sm:text-xs font-bold text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.15)] max-w-full">
+            <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse shrink-0" />
+            <span className="truncate">AUTONOMOUS CONTENT ENGINE // CRON READY</span>
           </div>
 
-          {/* Main Title with Carmine (lightning crawling on E) and Celestial Solar System O */}
-          <h1 className="text-4xl font-black tracking-tight text-white sm:text-6xl md:text-7xl leading-tight">
-            <CarmineTitle /> <br className="hidden sm:inline" />
+          {/* Main Title - Responsive fluid sizing ensuring mobile stability */}
+          <h1 className="text-[clamp(1.35rem,6.5vw,4.5rem)] font-black tracking-tight text-white leading-tight flex flex-col items-center justify-center gap-1 sm:gap-2">
+            <CarmineTitle />
             <ThemedTextFrame />
           </h1>
 
           {/* Subtitle */}
-          <p className="mx-auto max-w-2xl text-base text-slate-300 sm:text-lg leading-relaxed font-normal">
+          <p className="mx-auto max-w-2xl text-sm sm:text-base md:text-lg text-slate-300 leading-relaxed font-normal px-2">
             Harvest morning developer trends, score viral angles with{" "}
-            <strong className="text-sky-300 font-semibold">Gemini 3.5 Flash Lite</strong>, synthesize drafts in your voice with{" "}
-            <strong className="text-rose-400 font-semibold">Groq GPT-OSS 120B</strong>, and approve directly on your phone via{" "}
+            <strong className="text-sky-300 font-semibold">Gemini 2.0 Flash Lite</strong>, synthesize drafts in your voice with{" "}
+            <strong className="text-rose-400 font-semibold">Groq Llama 3.3</strong>, and approve directly on your phone via{" "}
             <strong className="text-white font-semibold">Telegram</strong>.
           </p>
 
           {/* Action Button Deck */}
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 pt-2">
             <Link
               href="/settings"
-              className="group relative flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-7 font-mono text-sm font-bold text-white shadow-[0_0_20px_rgba(56,189,248,0.3)] transition-all hover:from-sky-400 hover:to-blue-500 active:scale-95"
+              className="group relative flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-6 sm:px-7 font-mono text-xs sm:text-sm font-bold text-white shadow-[0_0_20px_rgba(56,189,248,0.3)] transition-all hover:from-sky-400 hover:to-blue-500 active:scale-95"
             >
               <span>INITIALIZE ENGINE</span>
               <span className="font-sans text-base transition-transform group-hover:translate-x-1">→</span>
@@ -51,7 +45,7 @@ export function Landing() {
 
             <Link
               href="/analytics"
-              className="flex h-11 items-center rounded-xl border border-slate-800 bg-slate-900/80 px-7 font-mono text-sm font-bold text-slate-300 backdrop-blur-md transition-all hover:border-sky-500 hover:text-white"
+              className="flex h-11 items-center rounded-xl border border-slate-800 bg-slate-900/80 px-6 sm:px-7 font-mono text-xs sm:text-sm font-bold text-slate-300 backdrop-blur-md transition-all hover:border-sky-500 hover:text-white"
             >
               TELEMETRY ANALYTICS
             </Link>
@@ -59,12 +53,12 @@ export function Landing() {
         </section>
 
         {/* TELEMETRY STATS GRID */}
-        <section>
+        <section className="relative z-10">
           <MechDesignerStats />
         </section>
 
         {/* PIPELINE MATRIX VISUALIZER */}
-        <section id="pipeline" className="space-y-4">
+        <section id="pipeline" className="relative z-10 space-y-4">
           <div className="text-center sm:text-left">
             <span className="font-mono text-xs font-bold uppercase tracking-widest text-sky-400">
               ARCHITECTURE OVERVIEW
@@ -77,7 +71,7 @@ export function Landing() {
         </section>
 
         {/* INTERACTIVE TEST CHAMBER SIMULATOR */}
-        <section id="simulator" className="space-y-4">
+        <section id="simulator" className="relative z-10 space-y-4">
           <div className="text-center sm:text-left">
             <span className="font-mono text-xs font-bold uppercase tracking-widest text-sky-400">
               LIVE PREVIEW & SVG DISINTEGRATION
@@ -90,12 +84,12 @@ export function Landing() {
         </section>
 
         {/* DUAL-BRAIN VOICE MATRIX */}
-        <section>
+        <section className="relative z-10">
           <VoiceMatrixCard />
         </section>
 
         {/* TARGET PLATFORMS DECK */}
-        <section className="mta-card rounded-2xl p-8 text-center space-y-6">
+        <section className="relative z-10 mta-card rounded-2xl p-6 sm:p-8 text-center space-y-6">
           <div>
             <span className="font-mono text-xs font-bold uppercase tracking-widest text-sky-400">
               MULTI-CHANNEL BROADCAST
@@ -150,30 +144,4 @@ export function Landing() {
       </div>
     </main>
   );
-}
-
-export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
-  // Auth object exists at module load when env is set — no effect needed.
-  const [ready, setReady] = useState(() => !auth);
-
-  useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setReady(true);
-    });
-  }, []);
-
-  if (!ready) {
-    return (
-      <main className="flex w-full justify-center px-4 py-24">
-        <p className="font-mono text-xs tracking-widest text-slate-500">
-          UPLINKING…
-        </p>
-      </main>
-    );
-  }
-  if (!user) return <Landing />;
-  return <Dashboard user={user} />;
 }

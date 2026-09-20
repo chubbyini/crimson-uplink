@@ -5,6 +5,7 @@ import React from "react";
 export default function CelestialO() {
   return (
     <span className="relative inline-flex items-center justify-center align-baseline mx-0.5 w-[0.8em] h-[0.8em]">
+      <span className="sr-only">O</span>
       {/* The Letter "O" Outer Orbital Portal Ring */}
       <svg
         className="w-full h-full overflow-visible"
