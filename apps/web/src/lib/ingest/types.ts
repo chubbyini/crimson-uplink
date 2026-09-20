@@ -1,4 +1,12 @@
-export type ItemSource = "hn" | "rss" | "youtube";
+export type ItemSource =
+  | "hn"
+  | "rss"
+  | "youtube"
+  | "bluesky"
+  | "mastodon"
+  | "github"
+  | "npm"
+  | "devto";
 
 export interface RawItem {
   title: string;

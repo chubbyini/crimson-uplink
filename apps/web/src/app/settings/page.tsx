@@ -21,6 +21,8 @@ export default function SettingsPage() {
     youtubeChannelIds: "",
     blueskyHandles: "",
     mastodonHandles: "",
+    npmPackages: "",
+    devtoTags: "",
   });
   const [status, setStatus] = useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +49,8 @@ export default function SettingsPage() {
             youtubeChannelIds: toLines(s.youtubeChannelIds),
             blueskyHandles: toLines(s.blueskyHandles),
             mastodonHandles: toLines(s.mastodonHandles),
+            npmPackages: toLines(s.npmPackages),
+            devtoTags: toLines(s.devtoTags),
           });
           setStatus("idle");
         } catch (e) {
@@ -95,6 +99,8 @@ export default function SettingsPage() {
         youtubeChannelIds: fromLines(lists.youtubeChannelIds),
         blueskyHandles: fromLines(lists.blueskyHandles),
         mastodonHandles: fromLines(lists.mastodonHandles),
+        npmPackages: fromLines(lists.npmPackages),
+        devtoTags: fromLines(lists.devtoTags),
       });
       setStatus("saved");
     } catch (e) {
@@ -158,6 +164,17 @@ export default function SettingsPage() {
           />
         </label>
         <label className="block text-sm font-medium">
+          GitHub token (optional — raises trending-search rate limit)
+          <input
+            type="password"
+            autoComplete="off"
+            value={form.githubToken}
+            onChange={(e) => set("githubToken", e.target.value)}
+            placeholder="github_pat_…"
+            className={inputCls}
+          />
+        </label>
+        <label className="block text-sm font-medium">
           Telegram chat ID (shared bot → your DMs)
           <input
             inputMode="numeric"
@@ -201,6 +218,26 @@ export default function SettingsPage() {
             rows={2}
             value={lists.mastodonHandles}
             onChange={(e) => setLists((l) => ({ ...l, mastodonHandles: e.target.value }))}
+            className={inputCls}
+          />
+        </label>
+        <label className="block text-sm font-medium">
+          npm packages to watch (one per line)
+          <textarea
+            rows={2}
+            value={lists.npmPackages}
+            onChange={(e) => setLists((l) => ({ ...l, npmPackages: e.target.value }))}
+            placeholder={"react\ntypescript"}
+            className={inputCls}
+          />
+        </label>
+        <label className="block text-sm font-medium">
+          Dev.to tags to watch (one per line)
+          <textarea
+            rows={2}
+            value={lists.devtoTags}
+            onChange={(e) => setLists((l) => ({ ...l, devtoTags: e.target.value }))}
+            placeholder={"javascript\nai"}
             className={inputCls}
           />
         </label>

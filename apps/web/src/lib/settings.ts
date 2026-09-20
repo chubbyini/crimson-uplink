@@ -8,10 +8,13 @@ export const SettingsSchema = z.object({
   devtoKey: z.string().default(""),
   linkedinToken: z.string().default(""),
   telegramChatId: z.string().default(""),
+  githubToken: z.string().default(""),
   rssFeeds: z.array(z.string()).default([]),
   youtubeChannelIds: z.array(z.string()).default([]),
   blueskyHandles: z.array(z.string()).default([]),
   mastodonHandles: z.array(z.string()).default([]),
+  npmPackages: z.array(z.string()).default([]),
+  devtoTags: z.array(z.string()).default([]),
   ingestEnabled: z.boolean().default(true),
 });
 
