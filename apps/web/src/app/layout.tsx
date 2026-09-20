@@ -67,15 +67,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <DesktopNav />
+            <MobileNav />
             <AuthButton />
           </div>
         </header>
 
-        {/* Main Content Area (bottom padding clears the mobile nav) */}
-        <div className="relative z-10 flex-1 pb-16 sm:pb-0">{children}</div>
-        <MobileNav />
+        {/* Main Content Area */}
+        <div className="relative z-10 flex-1">{children}</div>
 
         {/* Tactical Footer */}
         <footer className="relative z-10 border-t border-slate-800 bg-slate-950/90 py-6 px-6 text-center font-mono text-xs text-slate-500">
