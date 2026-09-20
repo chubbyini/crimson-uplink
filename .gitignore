@@ -1,0 +1,8 @@
+node_modules/
+.next/
+out/
+dist/
+*.local
+.env*.local
+apps/web/.next/
+apps/web/node_modules/
