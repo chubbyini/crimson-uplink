@@ -32,7 +32,9 @@ export async function generateDraft(
   idea: DraftInput
 ): Promise<{ text: string; model: string }> {
   const groq = createGroq({ apiKey });
-  const model = "llama-3.3-70b-versatile";
+  // Groq retires model IDs regularly (llama-3.3-70b-versatile went 2026-08-16).
+  // Override without a deploy: GROQ_MODEL=openai/gpt-oss-120b (or newer).
+  const model = process.env.GROQ_MODEL ?? "openai/gpt-oss-120b";
   const style = await styleGuide();
 
   const { text } = await generateText({
