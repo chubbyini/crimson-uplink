@@ -86,5 +86,26 @@ export async function POST(req: Request) {
   });
   await batch.commit();
 
-  return NextResponse.json({ count: ideas.length, ids: refs, ideas });
+  // Best-effort Telegram digest — scoring already succeeded, never fail it.
+  let telegram: { sent: boolean; reason?: string } = { sent: false };
+  if (settings.telegramChatId && process.env.TELEGRAM_BOT_TOKEN) {
+    try {
+      const { sendDigest } = await import("@/lib/telegram");
+      await sendDigest(
+        settings.telegramChatId.trim(),
+        uid,
+        ideas.map((idea, n) => ({ ...idea, id: refs[n] }))
+      );
+      telegram = { sent: true };
+    } catch (e) {
+      telegram = {
+        sent: false,
+        reason: e instanceof Error ? e.message.split("\n")[0] : "send failed",
+      };
+    }
+  } else {
+    telegram = { sent: false, reason: "Telegram not configured" };
+  }
+
+  return NextResponse.json({ count: ideas.length, ids: refs, ideas, telegram });
 }
