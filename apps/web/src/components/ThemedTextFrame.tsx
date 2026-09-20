@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
+import CelestialO from "./CelestialO";
 
-export default function ThemedTextFrame({ text }: { text: string }) {
+export default function ThemedTextFrame() {
   return (
     <span className="relative inline-block my-1 px-4 py-1 sm:px-6 sm:py-2">
       {/* Surrounding Themed SVG Matrix */}
@@ -99,19 +100,22 @@ export default function ThemedTextFrame({ text }: { text: string }) {
 
         {/* Micro-Crosshair Center Flanks */}
         <g opacity="0.6">
-          {/* Left Flank Crosshair */}
           <line x1="-8" y1="50%" x2="-2" y2="50%" stroke="#38bdf8" strokeWidth="1.2" />
           <line x1="-5" y1="calc(50% - 3px)" x2="-5" y2="calc(50% + 3px)" stroke="#38bdf8" strokeWidth="1.2" />
-
-          {/* Right Flank Crosshair */}
           <line x1="calc(100% + 2px)" y1="50%" x2="calc(100% + 8px)" y2="50%" stroke="#ff2a55" strokeWidth="1.2" />
           <line x1="calc(100% + 5px)" y1="calc(50% - 3px)" x2="calc(100% + 5px)" y2="calc(50% + 3px)" stroke="#ff2a55" strokeWidth="1.2" />
         </g>
       </svg>
 
-      {/* Solid Non-Gradient Text */}
-      <span className="relative z-10 font-black tracking-tight text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]">
-        {text}
+      {/* Solid Non-Gradient Text with the Animated Celestial Solar System O */}
+      <span className="relative z-10 inline-flex items-center font-black tracking-tight text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]">
+        <span>C</span>
+        <CelestialO />
+        <span>NTENT&nbsp;AUT</span>
+        <CelestialO />
+        <span>MATI</span>
+        <CelestialO />
+        <span>N</span>
       </span>
     </span>
   );
