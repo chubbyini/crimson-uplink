@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -22,13 +23,13 @@ export default function AuthButton() {
 
   if (!isFirebaseConfigured || !auth) {
     return (
-      <a
+      <Link
         href="/settings"
         className="flex h-9 items-center rounded-full border border-black/10 px-4 text-sm font-medium hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
         title="Set NEXT_PUBLIC_FIREBASE_* env vars (see apps/web/.env.example)"
       >
         Connect Firebase
-      </a>
+      </Link>
     );
   }
 

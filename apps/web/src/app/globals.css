@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #07090e;
+  --foreground: #f1f5f9;
+  --mta-cyan: #38bdf8;
+  --mta-slate: #1e293b;
+  --crimson-accent: #ff2a55;
+  --crimson-glow: #ff003c;
 }
 
 @theme inline {
@@ -12,15 +16,169 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Rationalized MTA Cyber Grid */
+.bg-mta-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(56, 189, 248, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(56, 189, 248, 0.03) 1px, transparent 1px);
+}
+
+/* Subtle Glow Utilities */
+.glow-mta-cyan {
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+}
+
+.glow-crimson-subtle {
+  box-shadow: 0 0 20px rgba(255, 42, 85, 0.15);
+}
+
+.text-glow-crimson {
+  text-shadow: 0 0 10px rgba(255, 42, 85, 0.5);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+/* Realistic Jagged Lightning Animations */
+@keyframes lightning-strike-1 {
+  0%, 100% {
+    opacity: 0;
+    stroke-dashoffset: 400;
+  }
+  2% {
+    opacity: 0.9;
+    stroke-dashoffset: 0;
+    filter: drop-shadow(0 0 8px #ff003c) drop-shadow(0 0 16px #ff2a55);
+  }
+  4% {
+    opacity: 0.2;
+  }
+  6% {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px #ff003c) drop-shadow(0 0 24px rgba(255, 0, 60, 0.8));
+  }
+  12% {
+    opacity: 0.4;
+  }
+  18% {
+    opacity: 0.8;
+  }
+  24% {
+    opacity: 0;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes lightning-strike-2 {
+  0%, 100% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 0;
+  }
+  42% {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px #ff2a55);
+  }
+  44% {
+    opacity: 0.3;
+  }
+  47% {
+    opacity: 0.9;
+  }
+  54% {
+    opacity: 0;
+  }
+}
+
+.animate-jagged-bolt-1 {
+  stroke-dasharray: 600;
+  animation: lightning-strike-1 4.2s ease-out infinite;
+}
+
+.animate-jagged-bolt-2 {
+  stroke-dasharray: 450;
+  animation: lightning-strike-2 4.2s ease-out infinite;
+}
+
+/* Vein Keyframes */
+@keyframes lightning-flash {
+  0%, 100% {
+    stroke-dashoffset: 600;
+    opacity: 0.1;
+  }
+  15% {
+    opacity: 1;
+    stroke: #ff2a55;
+    filter: drop-shadow(0 0 8px #ff2a55) drop-shadow(0 0 12px #38bdf8);
+  }
+  30% {
+    opacity: 0.3;
+  }
+  45% {
+    opacity: 1;
+    stroke: #38bdf8;
+    filter: drop-shadow(0 0 10px #38bdf8);
+  }
+  60% {
+    stroke-dashoffset: 0;
+    opacity: 0.2;
+  }
+}
+
+@keyframes spark-travel {
+  0% {
+    stroke-dashoffset: 400;
+  }
+  100% {
+    stroke-dashoffset: -400;
+  }
+}
+
+.animate-lightning {
+  stroke-dasharray: 80, 200;
+  animation: lightning-flash 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-spark-fast {
+  stroke-dasharray: 30, 150;
+  animation: spark-travel 2.2s linear infinite;
+}
+
+/* Precision Corner Cutouts */
+.mta-card {
+  position: relative;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.15);
+}
+
+.mta-card::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid #38bdf8;
+  border-left: 2px solid #38bdf8;
+}
+
+.mta-card::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-bottom: 2px solid #ff2a55;
+  border-right: 2px solid #ff2a55;
 }
