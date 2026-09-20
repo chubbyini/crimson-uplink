@@ -72,6 +72,34 @@ export default function DraftsPage() {
     setTimeout(() => setCopied((c) => (c === id ? null : c)), 2000);
   }
 
+  const [publishing, setPublishing] = useState<string | null>(null);
+  const [pubUrls, setPubUrls] = useState<Record<string, string>>({});
+
+  async function publishDevto(id: string) {
+    if (!user) return;
+    setPublishing(id);
+    setError(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/publish/devto", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ draftId: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Publish failed");
+      setPubUrls((m) => ({ ...m, [id]: data.url }));
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: "published" } : r)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Publish failed");
+    } finally {
+      setPublishing(null);
+    }
+  }
+
   if (!isFirebaseConfigured) {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
@@ -154,6 +182,25 @@ export default function DraftsPage() {
                     Reject
                   </button>
                 </>
+              )}
+              {d.status === "approved" && (
+                <button
+                  onClick={() => publishDevto(d.id)}
+                  disabled={publishing === d.id}
+                  className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-800 disabled:opacity-50"
+                >
+                  {publishing === d.id ? "Publishing…" : "Publish to Dev.to"}
+                </button>
+              )}
+              {pubUrls[d.id] && (
+                <a
+                  href={pubUrls[d.id]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="self-center text-xs text-sky-400 underline"
+                >
+                  View live →
+                </a>
               )}
             </div>
           </li>
