@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb, isAdminConfigured } from "@/lib/firebase-admin";
-import { runIngest } from "@/lib/ingest";
-import { urlHash } from "@/lib/ingest/normalize";
-import { SettingsSchema } from "@/lib/settings";
+import { ingestForUser, loadSettings } from "@/lib/pipeline";
 
 /**
  * POST /api/ingest — run the morning pull on demand for the signed-in user.
@@ -35,53 +33,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const db = adminDb();
-  const settingsSnap = await db.doc(`users/${uid}/settings/config`).get();
-  if (!settingsSnap.exists) {
+  const settings = await loadSettings(adminDb(), uid);
+  if (!settings) {
     return NextResponse.json({ error: "Save Settings first" }, { status: 400 });
   }
-  const settings = SettingsSchema.parse(settingsSnap.data());
 
-  const raw = await runIngest(settings);
-  const now = new Date().toISOString();
-
-  // Dedupe: skip hashes already stored for this user.
-  const refs = new Map<string, (typeof raw)[number]>();
-  for (const item of raw) {
-    try {
-      refs.set(urlHash(item.url), item);
-    } catch {
-      // Unparseable URL — skip.
-    }
-  }
-  const snaps = refs.size ? await db.getAll(...[...refs.keys()].map((h) => db.doc(`users/${uid}/items/${h}`))) : [];
-  const existing = new Set(snaps.filter((s) => s.exists).map((s) => s.id));
-
-  const batch = db.batch();
-  let added = 0;
-  for (const [hash, item] of refs) {
-    if (existing.has(hash)) {
-      batch.set(
-        db.doc(`users/${uid}/items/${hash}`),
-        { lastSeenAt: now },
-        { merge: true }
-      );
-    } else {
-      batch.set(db.doc(`users/${uid}/items/${hash}`), {
-        ...item,
-        hash,
-        firstSeenAt: now,
-        lastSeenAt: now,
-      });
-      added += 1;
-    }
-  }
-  if (refs.size) await batch.commit();
-
-  return NextResponse.json({
-    fetched: raw.length,
-    unique: refs.size,
-    added,
-    seenBefore: refs.size - added,
-  });
+  return NextResponse.json(await ingestForUser(adminDb(), uid, settings));
 }

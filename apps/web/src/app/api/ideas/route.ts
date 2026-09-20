@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb, isAdminConfigured } from "@/lib/firebase-admin";
-import { scoreIdeas } from "@/lib/ideas/score";
-import { SettingsSchema } from "@/lib/settings";
+import { loadSettings, scoreForUser } from "@/lib/pipeline";
 
 /**
  * POST /api/ideas — score the user's freshest items into a top-5 idea bank.
@@ -31,81 +30,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const db = adminDb();
-  const settingsSnap = await db.doc(`users/${uid}/settings/config`).get();
-  if (!settingsSnap.exists) {
+  const settings = await loadSettings(adminDb(), uid);
+  if (!settings) {
     return NextResponse.json({ error: "Save Settings first" }, { status: 400 });
   }
-  const settings = SettingsSchema.parse(settingsSnap.data());
-  if (!settings.geminiKey) {
-    return NextResponse.json(
-      { error: "Add your Gemini API key in Settings first" },
-      { status: 400 }
-    );
-  }
 
-  const itemsSnap = await db
-    .collection(`users/${uid}/items`)
-    .orderBy("lastSeenAt", "desc")
-    .limit(40)
-    .get();
-  const items = itemsSnap.docs.map((d) => {
-    const v = d.data() as { title?: string; url?: string; source?: string; points?: number; commentCount?: number };
-    return {
-      title: v.title ?? "(untitled)",
-      url: v.url ?? "",
-      source: v.source ?? "rss",
-      points: v.points,
-      commentCount: v.commentCount,
-    };
-  }).filter((i) => i.url);
-
-  if (!items.length) {
-    return NextResponse.json(
-      { error: "No items yet — run ingest first" },
-      { status: 400 }
-    );
-  }
-
-  let ideas;
   try {
-    ideas = await scoreIdeas(settings.geminiKey, items);
+    return NextResponse.json(await scoreForUser(adminDb(), uid, settings));
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? `Gemini failed: ${e.message}` : "Gemini failed" },
-      { status: 502 }
-    );
+    const message = e instanceof Error ? e.message : "Scoring failed";
+    const status = message.startsWith("Gemini failed") ? 502 : 400;
+    return NextResponse.json({ error: message }, { status });
   }
-
-  const now = new Date().toISOString();
-  const batch = db.batch();
-  const refs = ideas.map((idea) => {
-    const ref = db.collection(`users/${uid}/ideas`).doc();
-    batch.set(ref, { ...idea, status: "new", createdAt: now });
-    return ref.id;
-  });
-  await batch.commit();
-
-  // Best-effort Telegram digest — scoring already succeeded, never fail it.
-  let telegram: { sent: boolean; reason?: string } = { sent: false };
-  if (settings.telegramChatId && process.env.TELEGRAM_BOT_TOKEN) {
-    try {
-      const { sendDigest } = await import("@/lib/telegram");
-      await sendDigest(
-        settings.telegramChatId.trim(),
-        uid,
-        ideas.map((idea, n) => ({ ...idea, id: refs[n] }))
-      );
-      telegram = { sent: true };
-    } catch (e) {
-      telegram = {
-        sent: false,
-        reason: e instanceof Error ? e.message.split("\n")[0] : "send failed",
-      };
-    }
-  } else {
-    telegram = { sent: false, reason: "Telegram not configured" };
-  }
-
-  return NextResponse.json({ count: ideas.length, ids: refs, ideas, telegram });
 }
