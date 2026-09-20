@@ -87,19 +87,19 @@ export default function DraftsPage() {
     setEditing(null);
   }
 
-  async function publishDevto(id: string) {
+  async function publishTo(url: string, id: string, body?: object) {
     if (!user) return;
     setPublishing(id);
     setError(null);
     try {
       const token = await user.getIdToken();
-      const res = await fetch("/api/publish/devto", {
+      const res = await fetch(url, {
         method: "POST",
         headers: {
           authorization: `Bearer ${token}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ draftId: id }),
+        body: JSON.stringify({ draftId: id, ...body }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Publish failed");
@@ -110,6 +110,10 @@ export default function DraftsPage() {
     } finally {
       setPublishing(null);
     }
+  }
+
+  async function publishDevto(id: string) {
+    await publishTo("/api/publish/devto", id);
   }
 
   if (!isFirebaseConfigured) {
@@ -232,13 +236,24 @@ export default function DraftsPage() {
                 </>
               )}
               {d.status === "approved" && (
-                <button
-                  onClick={() => publishDevto(d.id)}
-                  disabled={publishing === d.id}
-                  className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-800 disabled:opacity-50"
-                >
-                  {publishing === d.id ? "Publishing…" : "Publish to Dev.to"}
-                </button>
+                <>
+                  <button
+                    onClick={() => publishDevto(d.id)}
+                    disabled={publishing === d.id}
+                    className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-800 disabled:opacity-50"
+                  >
+                    {publishing === d.id ? "Publishing…" : "Publish to Dev.to"}
+                  </button>
+                  {d.format === "linkedin" && (
+                    <button
+                      onClick={() => publishTo("/api/publish/linkedin", d.id)}
+                      disabled={publishing === d.id}
+                      className="rounded-full border border-sky-500/50 px-4 py-1.5 text-xs font-medium text-sky-300 hover:bg-sky-500/10 disabled:opacity-50"
+                    >
+                      {publishing === d.id ? "Publishing…" : "Publish to LinkedIn"}
+                    </button>
+                  )}
+                </>
               )}
               {pubUrls[d.id] && (
                 <a
