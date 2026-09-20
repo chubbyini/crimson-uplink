@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
+import { useRouter } from "next/navigation";
 import {
   collection,
   doc,
@@ -29,6 +30,7 @@ const PAGE_SIZE = 20;
 
 export default function IdeasPage() {
   const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
   const [rows, setRows] = useState<IdeaRow[]>([]);
   const [filter, setFilter] = useState<(typeof filters)[number]>("all");
   const [status, setStatus] = useState<"idle" | "loading" | "scoring" | "error">("idle");
@@ -65,6 +67,7 @@ export default function IdeasPage() {
     if (!auth) return;
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
+      if (!u) router.replace("/");
       if (u) void load(u, true);
     });
   }, []);

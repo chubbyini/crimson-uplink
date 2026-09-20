@@ -2,7 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+
+/** Null while signed out (landing stays clean); true once authenticated. */
+function useSignedIn(): User | null {
+  const [user, setUser] = useState<User | null>(null);
+  useEffect(() => {
+    if (!auth) return;
+    return onAuthStateChanged(auth, setUser);
+  }, []);
+  return user;
+}
 
 const links = [
   { href: "/items", label: "SOURCES" },
@@ -15,6 +27,8 @@ const links = [
 
 export function DesktopNav() {
   const path = usePathname();
+  const user = useSignedIn();
+  if (!user) return null;
   return (
     <nav className="hidden sm:flex items-center gap-4 font-mono text-xs font-medium">
       {links.map((l) => (
@@ -37,7 +51,9 @@ export function DesktopNav() {
 
 export function MobileNav() {
   const path = usePathname();
+  const user = useSignedIn();
   const [open, setOpen] = useState(false);
+  if (!user) return null;
   return (
     <div className="relative sm:hidden">
       <button

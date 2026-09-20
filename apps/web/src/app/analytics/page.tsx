@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
+import { useRouter } from "next/navigation";
 import {
   addDoc,
   collection,
@@ -37,6 +38,7 @@ const platforms: Platform[] = ["linkedin", "devto", "x", "medium"];
 
 export default function AnalyticsPage() {
   const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
   const [rows, setRows] = useState<PublishRow[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "syncing" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +78,7 @@ export default function AnalyticsPage() {
     if (!auth) return;
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
+      if (!u) router.replace("/");
       if (u) void load(u);
     });
   }, []);

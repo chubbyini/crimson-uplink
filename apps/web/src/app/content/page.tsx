@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
+import { useRouter } from "next/navigation";
 import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import { useEffect } from "react";
 
@@ -25,6 +26,7 @@ interface ContentResult {
 
 export default function ContentPage() {
   const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
   const [topics, setTopics] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +34,10 @@ export default function ContentPage() {
 
   useEffect(() => {
     if (!auth) return;
-    return onAuthStateChanged(auth, setUser);
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      if (!u) router.replace("/");
+    });
   }, []);
 
   async function run(e: React.FormEvent) {

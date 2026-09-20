@@ -3,7 +3,7 @@ import { adminAuth, adminDb, isAdminConfigured } from "@/lib/firebase-admin";
 import { loadSettings, scoreForUser } from "@/lib/pipeline";
 
 /**
- * POST /api/ideas — score the user's freshest items into a top-5 idea bank.
+ * POST /api/ideas — score the user's freshest items into a top-10 idea bank.
  * Auth: Firebase ID token in `Authorization: Bearer <token>`.
  * Reads users/{uid}/items (latest 40), writes users/{uid}/ideas.
  */

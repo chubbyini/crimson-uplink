@@ -1,4 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import Dashboard from "@/components/Dashboard";
 import CarmineTitle from "@/components/CarmineTitle";
 import ThemedTextFrame from "@/components/ThemedTextFrame";
 import PipelineVisualizer from "@/components/PipelineVisualizer";
@@ -6,7 +12,7 @@ import BioMechSimulator from "@/components/BioMechSimulator";
 import MechDesignerStats from "@/components/MechDesignerStats";
 import VoiceMatrixCard from "@/components/VoiceMatrixCard";
 
-export default function Home() {
+export function Landing() {
   return (
     <main className="flex w-full flex-col items-center px-4 py-12 sm:px-8 md:py-20">
       <div className="w-full max-w-6xl space-y-16">
@@ -144,4 +150,30 @@ export default function Home() {
       </div>
     </main>
   );
+}
+
+export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
+  // Auth object exists at module load when env is set — no effect needed.
+  const [ready, setReady] = useState(() => !auth);
+
+  useEffect(() => {
+    if (!auth) return;
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setReady(true);
+    });
+  }, []);
+
+  if (!ready) {
+    return (
+      <main className="flex w-full justify-center px-4 py-24">
+        <p className="font-mono text-xs tracking-widest text-slate-500">
+          UPLINKING…
+        </p>
+      </main>
+    );
+  }
+  if (!user) return <Landing />;
+  return <Dashboard user={user} />;
 }

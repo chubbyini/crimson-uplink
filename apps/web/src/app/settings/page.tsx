@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
+import { useRouter } from "next/navigation";
 import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import { emptySettings, type Settings } from "@/lib/settings";
 import { getSettings, saveSettings } from "@/lib/settings-store";
@@ -16,6 +17,7 @@ const fromLines = (text: string) =>
 
 export default function SettingsPage() {
   const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
   const [form, setForm] = useState<Settings>(emptySettings);
   const [lists, setLists] = useState({
     rssFeeds: "",
@@ -39,6 +41,7 @@ export default function SettingsPage() {
     if (!auth) return;
     return onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      if (!u) router.replace("/");
       if (u) {
         setStatus("loading");
         try {

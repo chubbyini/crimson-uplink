@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
+import { useRouter } from "next/navigation";
 import {
   collection,
   getDocs,
@@ -27,6 +28,7 @@ const sources = ["all", "hn", "rss", "youtube", "bluesky", "mastodon", "github",
 
 export default function ItemsPage() {
   const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
   const [rows, setRows] = useState<ItemRow[]>([]);
   const [filter, setFilter] = useState("all");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -36,6 +38,7 @@ export default function ItemsPage() {
     if (!auth) return;
     return onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      if (!u) router.replace("/");
       if (u && db) {
         setStatus("loading");
         try {
