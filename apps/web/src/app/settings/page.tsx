@@ -24,6 +24,13 @@ export default function SettingsPage() {
   });
   const [status, setStatus] = useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [ingest, setIngest] = useState<null | {
+    fetched: number;
+    unique: number;
+    added: number;
+    seenBefore: number;
+  }>(null);
+  const [ingesting, setIngesting] = useState(false);
 
   useEffect(() => {
     if (!auth) return;
@@ -219,6 +226,47 @@ export default function SettingsPage() {
           {error && <span className="text-sm text-red-600">{error}</span>}
         </div>
       </form>
+      <section className="mt-10 rounded-2xl border border-black/10 p-5 dark:border-white/10">
+        <h2 className="text-base font-semibold">Ingest now</h2>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          Pulls HN front page + your RSS feeds + YouTube channels into{" "}
+          <code className="font-mono">users/{user.uid}/items</code>, deduped by
+          URL hash. Needs server env{" "}
+          <code className="font-mono">FIREBASE_SERVICE_ACCOUNT_JSON</code>.
+        </p>
+        <button
+          type="button"
+          disabled={ingesting}
+          onClick={async () => {
+            setIngesting(true);
+            setIngest(null);
+            setError(null);
+            try {
+              const token = await user.getIdToken();
+              const res = await fetch("/api/ingest", {
+                method: "POST",
+                headers: { authorization: `Bearer ${token}` },
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error ?? "Ingest failed");
+              setIngest(data);
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Ingest failed");
+            } finally {
+              setIngesting(false);
+            }
+          }}
+          className="mt-3 flex h-10 items-center rounded-full border border-black/10 px-5 text-sm font-medium hover:bg-black/5 disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/10"
+        >
+          {ingesting ? "Ingesting…" : "Run ingest now"}
+        </button>
+        {ingest && (
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            Fetched {ingest.fetched} · unique {ingest.unique} · added{" "}
+            {ingest.added} · seen before {ingest.seenBefore}.
+          </p>
+        )}
+      </section>
     </main>
   );
 }

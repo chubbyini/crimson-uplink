@@ -9,5 +9,9 @@
     "dev": "npm --workspace crimson-uplink-web run dev",
     "build": "npm --workspace crimson-uplink-web run build",
     "lint": "npm --workspace crimson-uplink-web run lint"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.4.0",
+    "rss-parser": "^3.13.0"
   }
 }
