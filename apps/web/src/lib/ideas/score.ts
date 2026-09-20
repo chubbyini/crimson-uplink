@@ -23,7 +23,7 @@ export async function scoreIdeas(apiKey: string, items: ScorableItem[]) {
   );
 
   const { object } = await generateObject({
-    model: google("gemini-2.0-flash-lite"),
+    model: google("gemini-3.5-flash-lite"),
     schema: IdeasSchema,
     system:
       "You curate content ideas for a developer who posts on LinkedIn, X, and Dev.to. " +
