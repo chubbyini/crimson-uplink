@@ -29,7 +29,7 @@ interface BskyFeedItem {
  */
 export async function fetchBlueskyAccounts(
   handles: string[],
-  perAccount = 10
+  perAccount = 25
 ): Promise<RawItem[]> {
   const out: RawItem[] = [];
   for (const handle of handles) {

@@ -28,7 +28,7 @@ const stripHtml = (html: string) =>
  */
 export async function fetchMastodonAccounts(
   handles: string[],
-  perAccount = 10
+  perAccount = 25
 ): Promise<RawItem[]> {
   const out: RawItem[] = [];
   for (const raw of handles) {

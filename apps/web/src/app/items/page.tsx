@@ -43,7 +43,7 @@ export default function ItemsPage() {
             query(
               collection(db, "users", u.uid, "items"),
               orderBy("lastSeenAt", "desc"),
-              limit(100)
+              limit(200)
             )
           );
           setRows(

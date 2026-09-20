@@ -1,9 +1,9 @@
 import type { RawItem } from "@/lib/ingest/types";
 
-/** Full-text story search on HN Algolia. */
-export async function searchHn(topic: string, perTopic = 10): Promise<RawItem[]> {
+/** Full-text story search on HN Algolia (up to 50 hits). */
+export async function searchHn(topic: string, perTopic = 25): Promise<RawItem[]> {
   const res = await fetch(
-    `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(topic)}&tags=story`
+    `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(topic)}&tags=story&hitsPerPage=50`
   );
   if (!res.ok) return [];
   const data = (await res.json()) as {
@@ -33,7 +33,7 @@ export async function searchHn(topic: string, perTopic = 10): Promise<RawItem[]>
 export async function searchGithub(
   topic: string,
   token?: string,
-  perTopic = 10
+  perTopic = 25
 ): Promise<RawItem[]> {
   const res = await fetch(
     `https://api.github.com/search/repositories?q=${encodeURIComponent(topic)}&sort=stars&order=desc&per_page=${perTopic}`,
@@ -93,7 +93,7 @@ export async function searchLobsters(topic: string): Promise<RawItem[]> {
         (words.some((w) => s.title!.toLowerCase().includes(w)) ||
           words.some((w) => (s.description_plain ?? "").toLowerCase().includes(w)))
     )
-    .slice(0, 10)
+    .slice(0, 20)
     .map((s) => ({
       title: s.title as string,
       url: s.url as string,
@@ -108,7 +108,7 @@ export async function searchLobsters(topic: string): Promise<RawItem[]> {
 /** Stack Overflow advanced search. Free, no key (~300 req/day/IP). */
 export async function searchStackOverflow(
   topic: string,
-  perTopic = 10
+  perTopic = 25
 ): Promise<RawItem[]> {
   const res = await fetch(
     `https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=votes&q=${encodeURIComponent(topic)}&site=stackoverflow&pagesize=${perTopic}&filter=!nNPvSNd7bg`

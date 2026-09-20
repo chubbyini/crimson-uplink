@@ -12,7 +12,7 @@ interface DevtoArticle {
 /** Top articles of the past week per tag. No key needed for public reads. */
 export async function fetchDevtoByTags(
   tags: string[],
-  perTag = 5
+  perTag = 10
 ): Promise<RawItem[]> {
   const out: RawItem[] = [];
   for (const tag of tags) {

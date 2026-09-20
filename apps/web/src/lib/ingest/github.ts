@@ -14,7 +14,7 @@ interface GhRepo {
  */
 export async function fetchTrendingRepos(
   token?: string,
-  perPage = 20
+  perPage = 50
 ): Promise<RawItem[]> {
   const since = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
   const res = await fetch(
