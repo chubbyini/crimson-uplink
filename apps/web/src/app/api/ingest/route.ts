@@ -26,8 +26,13 @@ export async function POST(req: Request) {
   let uid: string;
   try {
     uid = (await adminAuth().verifyIdToken(token)).uid;
-  } catch {
-    return NextResponse.json({ error: "Invalid ID token" }, { status: 401 });
+  } catch (e) {
+    const reason =
+      e instanceof Error ? e.message.split("\n")[0] : "Invalid ID token";
+    return NextResponse.json(
+      { error: `Invalid ID token (${reason}). Try signing out/in; if it persists, sync your system clock.` },
+      { status: 401 }
+    );
   }
 
   const db = adminDb();
