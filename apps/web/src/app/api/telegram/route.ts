@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { isAdminConfigured } from "@/lib/firebase-admin";
-import { handleCallback, isTelegramConfigured } from "@/lib/telegram";
+import {
+  handleCallback,
+  handleIncomingMessage,
+  isTelegramConfigured,
+} from "@/lib/telegram";
 
 /**
- * POST /api/telegram — Telegram webhook (callback_query from digest buttons).
+ * POST /api/telegram — Telegram webhook: digest button taps (callback_query)
+ * and DMs (/topics research, /start help).
  * Set once per deploy:
  *   https://api.telegram.org/bot<TOKEN>/setWebhook?url=<PUBLIC_URL>/api/telegram&secret_token=<SECRET>
  * with TELEGRAM_WEBHOOK_SECRET in server env. Local dev can't receive
@@ -22,18 +27,27 @@ export async function POST(req: Request) {
 
   const update = (await req.json()) as {
     callback_query?: { id: string; from?: { id?: number }; data?: string };
+    message?: { chat?: { id?: number }; text?: string };
   };
   const cb = update.callback_query;
-  if (!cb?.id || !cb.data || !cb.from?.id) {
+  if (cb?.id && cb.data && cb.from?.id) {
+    try {
+      await handleCallback(cb.id, cb.from.id, cb.data);
+    } catch (e) {
+      // Log for `vercel logs` / server console; Telegram already got its answer
+      // inside handleCallback for known paths.
+      console.error("telegram callback failed:", e instanceof Error ? e.message : e);
+    }
     return NextResponse.json({ ok: true });
   }
 
-  try {
-    await handleCallback(cb.id, cb.from.id, cb.data);
-  } catch (e) {
-    // Log for `vercel logs` / server console; Telegram already got its answer
-    // inside handleCallback for known paths.
-    console.error("telegram callback failed:", e instanceof Error ? e.message : e);
+  const msg = update.message;
+  if (msg?.chat?.id && typeof msg.text === "string") {
+    try {
+      await handleIncomingMessage(msg.chat.id, msg.text);
+    } catch (e) {
+      console.error("telegram message failed:", e instanceof Error ? e.message : e);
+    }
   }
   return NextResponse.json({ ok: true });
 }

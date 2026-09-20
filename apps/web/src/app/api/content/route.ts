@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb, isAdminConfigured } from "@/lib/firebase-admin";
 import { generateDraft } from "@/lib/draft/generate";
-import { urlHash } from "@/lib/ingest/normalize";
-import type { RawItem } from "@/lib/ingest/types";
-import { loadSettings } from "@/lib/pipeline";
+import { loadSettings, storeItems } from "@/lib/pipeline";
 import { scoreIdeas } from "@/lib/ideas/score";
 import { searchTopics } from "@/lib/search";
 
@@ -52,43 +50,18 @@ export async function POST(req: Request) {
 
   const db = adminDb();
   const raw = await searchTopics({ topics: clean, githubToken: settings.githubToken || undefined });
+  const stored = await storeItems(db, uid, raw, { topicSearch: clean });
   const now = new Date().toISOString();
 
-  // Dedupe-store (same items collection as the morning pull).
-  const refs = new Map<string, RawItem>();
-  for (const item of raw) {
-    try {
-      refs.set(urlHash(item.url), item);
-    } catch {
-      // Skip.
-    }
-  }
-  const snaps = refs.size
-    ? await db.getAll(...[...refs.keys()].map((h) => db.doc(`users/${uid}/items/${h}`)))
-    : [];
-  const existing = new Set(snaps.filter((s) => s.exists).map((s) => s.id));
-  const batch = db.batch();
-  let added = 0;
-  for (const [hash, item] of refs) {
-    if (!existing.has(hash)) {
-      batch.set(db.doc(`users/${uid}/items/${hash}`), {
-        ...item,
-        hash,
-        firstSeenAt: now,
-        lastSeenAt: now,
-        topicSearch: clean,
-      });
-      added += 1;
-    }
-  }
-  if (refs.size) await batch.commit();
+  // Score a URL-deduped view of the haul.
+  const forScoring = [...new Map(raw.map((i) => [i.url, i])).values()];
 
   // Score the haul.
   let ideas;
   try {
     ideas = await scoreIdeas(
       settings.geminiKey,
-      [...refs.values()].map((i) => ({
+      forScoring.map((i) => ({
         title: i.title,
         url: i.url,
         source: i.source,
@@ -100,8 +73,8 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         fetched: raw.length,
-        unique: refs.size,
-        added,
+        unique: stored.unique,
+        added: stored.added,
         error: e instanceof Error ? `Gemini failed: ${e.message}` : "Gemini failed",
       },
       { status: 502 }
@@ -158,8 +131,8 @@ export async function POST(req: Request) {
   return NextResponse.json({
     topics: clean,
     fetched: raw.length,
-    unique: refs.size,
-    added,
+    unique: stored.unique,
+    added: stored.added,
     ideas: ideas.map((idea, n) => ({ ...idea, id: ideaIds[n] })),
     draft,
     draftNote,

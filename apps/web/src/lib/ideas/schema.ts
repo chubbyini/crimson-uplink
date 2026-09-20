@@ -16,7 +16,7 @@ export const IdeaSchema = z.object({
 });
 
 export const IdeasSchema = z.object({
-  ideas: z.array(IdeaSchema).max(5),
+  ideas: z.array(IdeaSchema).max(10),
 });
 
 export type Idea = z.infer<typeof IdeaSchema>;

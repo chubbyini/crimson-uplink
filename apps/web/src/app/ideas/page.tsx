@@ -10,7 +10,9 @@ import {
   limit,
   orderBy,
   query,
+  startAfter,
   updateDoc,
+  type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import type { IdeaStatus, StoredIdea } from "@/lib/ideas/schema";
@@ -21,6 +23,10 @@ interface IdeaRow extends StoredIdea {
 
 const filters: Array<"all" | IdeaStatus> = ["all", "new", "approved", "skipped", "drafted"];
 
+// Server-side pagination: Firestore only transfers one page per request,
+// so the bank holds unlimited ideas while the client stays light.
+const PAGE_SIZE = 20;
+
 export default function IdeasPage() {
   const [user, setUser] = useState<User | null>(null);
   const [rows, setRows] = useState<IdeaRow[]>([]);
@@ -29,21 +35,25 @@ export default function IdeasPage() {
   const [error, setError] = useState<string | null>(null);
   const [drafting, setDrafting] = useState<string | null>(null);
   const [tg, setTg] = useState<null | { sent: boolean; reason?: string }>(null);
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
 
-  async function load(u: User) {
+  async function load(u: User, reset = false) {
     if (!db) return;
     setStatus("loading");
     try {
+      const base = query(
+        collection(db, "users", u.uid, "ideas"),
+        orderBy("createdAt", "desc"),
+        limit(PAGE_SIZE)
+      );
       const snap = await getDocs(
-        query(
-          collection(db, "users", u.uid, "ideas"),
-          orderBy("createdAt", "desc"),
-          limit(50)
-        )
+        reset || !cursor ? base : query(base, startAfter(cursor))
       );
-      setRows(
-        snap.docs.map((d) => ({ id: d.id, ...(d.data() as StoredIdea) }))
-      );
+      const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as StoredIdea) }));
+      setRows((rs) => (reset ? docs : [...rs, ...docs]));
+      setCursor(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.size === PAGE_SIZE);
       setStatus("idle");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load ideas");
@@ -55,7 +65,7 @@ export default function IdeasPage() {
     if (!auth) return;
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (u) void load(u);
+      if (u) void load(u, true);
     });
   }, []);
 
@@ -79,7 +89,7 @@ export default function IdeasPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Scoring failed");
       setTg(data.telegram ?? null);
-      await load(user);
+      await load(user, true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scoring failed");
       setStatus("error");
@@ -234,6 +244,23 @@ export default function IdeasPage() {
         <p className="mt-6 text-sm text-zinc-500">
           No ideas yet. Run ingest, then Score fresh items.
         </p>
+      )}
+      {visible.length > 0 && (
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <p className="text-xs text-zinc-500">
+            Showing {visible.length} of your bank
+            {filter !== "all" ? ` (filtered: ${filter})` : ""}
+          </p>
+          {hasMore && (
+            <button
+              onClick={() => user && load(user)}
+              disabled={status === "loading"}
+              className="rounded-full border border-black/10 px-5 py-2 text-xs font-medium text-slate-700 hover:bg-black/5 disabled:opacity-50 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
+            >
+              {status === "loading" ? "Loading…" : "Load more"}
+            </button>
+          )}
+        </div>
       )}
     </main>
   );

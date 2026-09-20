@@ -12,21 +12,20 @@ export interface IngestResult {
   seenBefore: number;
 }
 
-export interface ScoreResult {
-  count: number;
-  ids: string[];
-  telegram: { sent: boolean; reason?: string };
+export interface StoreResult {
+  unique: number;
+  added: number;
+  seenBefore: number;
 }
 
-/** Pull + dedupe-store items for one user. Shared by /api/ingest and cron. */
-export async function ingestForUser(
+/** Dedupe-store raw items into users/{uid}/items (hash doc IDs). Shared. */
+export async function storeItems(
   db: Firestore,
   uid: string,
-  settings: Settings
-): Promise<IngestResult> {
-  const raw = await runIngest(settings);
+  raw: RawItem[],
+  extra: Record<string, unknown> = {}
+): Promise<StoreResult> {
   const now = new Date().toISOString();
-
   const refs = new Map<string, RawItem>();
   for (const item of raw) {
     try {
@@ -52,6 +51,7 @@ export async function ingestForUser(
     } else {
       batch.set(db.doc(`users/${uid}/items/${hash}`), {
         ...item,
+        ...extra,
         hash,
         firstSeenAt: now,
         lastSeenAt: now,
@@ -60,8 +60,24 @@ export async function ingestForUser(
     }
   }
   if (refs.size) await batch.commit();
+  return { unique: refs.size, added, seenBefore: refs.size - added };
+}
 
-  return { fetched: raw.length, unique: refs.size, added, seenBefore: refs.size - added };
+export interface ScoreResult {
+  count: number;
+  ids: string[];
+  telegram: { sent: boolean; reason?: string };
+}
+
+/** Pull + dedupe-store items for one user. Shared by /api/ingest and cron. */
+export async function ingestForUser(
+  db: Firestore,
+  uid: string,
+  settings: Settings
+): Promise<IngestResult> {
+  const raw = await runIngest(settings);
+  const stored = await storeItems(db, uid, raw);
+  return { fetched: raw.length, ...stored };
 }
 
 /** Score freshest items into ideas + best-effort Telegram digest. */
@@ -75,7 +91,7 @@ export async function scoreForUser(
   const itemsSnap = await db
     .collection(`users/${uid}/items`)
     .orderBy("lastSeenAt", "desc")
-    .limit(40)
+    .limit(100)
     .get();
   const items = itemsSnap.docs
     .map((d) => {

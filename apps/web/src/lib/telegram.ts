@@ -45,7 +45,7 @@ export async function sendDigest(
     );
   });
 
-  await b.api.sendMessage(chatId, `<b>Crimson Uplink — top 5</b>\n\n${lines.join("\n\n")}`, {
+  await b.api.sendMessage(chatId, `<b>Crimson Uplink — top 10</b>\n\n${lines.join("\n\n")}`, {
     parse_mode: "HTML",
     link_preview_options: { is_disabled: true },
     reply_markup: {
@@ -63,8 +63,7 @@ export async function sendDigest(
   });
 }
 
-/** Handle Approve/Skip taps. Returns a short status for logging. */
-export async function handleCallback(
+/** Handle Approve/Skip taps. Returns a short status for logging. */export async function handleCallback(
   callbackId: string,
   fromChatId: number,
   data: string
@@ -98,4 +97,114 @@ export async function handleCallback(
     text: action === "a" ? "Approved ✓" : "Skipped",
   });
   return action === "a" ? "approved" : "skipped";
+}
+
+const HELP =
+  "Send <code>/topics ai, vector databases</code> and I'll research them " +
+  "across HN, GitHub, Lobsters, Stack Overflow, Dev.to and Medium, then " +
+  "reply with 10 scored ideas (approve with ✅). " +
+  "Morning digests arrive automatically at 06:00.";
+
+/**
+ * Handle incoming DMs. /topics runs the full research → ideas → digest flow
+ * for the user whose Settings chat ID matches; anything else gets HELP.
+ * Note: runs synchronously inside the webhook — allow up to ~60s.
+ */
+export async function handleIncomingMessage(
+  chatId: number,
+  text: string
+): Promise<string> {
+  const b = getBot();
+  if (!b) throw new Error("Telegram not configured");
+
+  const { adminDb } = await import("./firebase-admin");
+  const db = adminDb();
+
+  const send = (msg: string, parse = true) =>
+    b.api.sendMessage(String(chatId), msg, {
+      ...(parse ? { parse_mode: "HTML" as const } : {}),
+    });
+
+  if (!text.trim().toLowerCase().startsWith("/topics")) {
+    await send(HELP);
+    return "help";
+  }
+
+  // Which user owns this chat? (shared-bot safety)
+  const owners = await db
+    .collectionGroup("settings")
+    .where("telegramChatId", "==", String(chatId))
+    .limit(1)
+    .get();
+  if (owners.empty) {
+    await send(
+      "I don't know this chat. Save your Telegram chat ID in Crimson Uplink → Settings first.",
+      false
+    );
+    return "unknown-chat";
+  }
+  const uid = owners.docs[0].ref.parent.parent!.id;
+
+  const topics = text
+    .replace(/^\/topics(@\w+)?/i, "")
+    .split(/[\n,]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!topics.length) {
+    await send("Give me topics: <code>/topics ai, rust, GPUs</code>");
+    return "no-topics";
+  }
+
+  const { SettingsSchema } = await import("./settings");
+  const { searchTopics } = await import("./search");
+  const { scoreIdeas } = await import("./ideas/score");
+  const { storeItems } = await import("./pipeline");
+
+  const settingsSnap = await db.doc(`users/${uid}/settings/config`).get();
+  const settings = SettingsSchema.parse(settingsSnap.data());
+  if (!settings.geminiKey) {
+    await send("Add your Gemini API key in Settings first.", false);
+    return "no-key";
+  }
+
+  await send(`Researching <b>${esc(topics.join(", "))}</b>… give me up to a minute.`);
+  const now = new Date().toISOString();
+  try {
+    const raw = await searchTopics({
+      topics,
+      githubToken: settings.githubToken || undefined,
+    });
+    await storeItems(db, uid, raw, { topicSearch: topics });
+    const ideas = await scoreIdeas(
+      settings.geminiKey,
+      [...new Map(raw.map((i) => [i.url, i])).values()].map((i) => ({
+        title: i.title,
+        url: i.url,
+        source: i.source,
+        points: i.points,
+        commentCount: i.commentCount,
+      }))
+    );
+
+    const batch = db.batch();
+    const ids = ideas.map((idea) => {
+      const ref = db.collection(`users/${uid}/ideas`).doc();
+      batch.set(ref, { ...idea, status: "new", createdAt: now, topicSearch: topics });
+      return ref.id;
+    });
+    await batch.commit();
+
+    await sendDigest(
+      String(chatId),
+      uid,
+      ideas.map((idea, n) => ({ ...idea, id: ids[n] }))
+    );
+    return "digested";
+  } catch (e) {
+    await send(
+      `Research failed: ${esc(e instanceof Error ? e.message.split("\n")[0] : "unknown")}`,
+      false
+    );
+    return "failed";
+  }
 }

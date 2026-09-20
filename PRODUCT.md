@@ -17,8 +17,9 @@ approval — from the phone via Telegram or from the Next.js dashboard.
    trends. X/LinkedIn feeds are NOT scraped (ToS + paywall); follow the same
    people via RSS/Bluesky instead.
 2. **Idea bank** — morning job pulls, dedupes by normalized URL hash, Gemini
-   2.0 Flash Lite (`ai` + `zod`) scores to top 5 with angle + source link +
-   suggested format. Stored per-user in Firestore.
+   (Flash Lite, `ai` + `zod`) scores to top 10 with angle + source link +
+   suggested format. Stored per-user in Firestore (unbounded; dashboard pages
+   server-side in cursors).
 3. **Drafter** — Groq `llama-3.3-70b-versatile` (`@ai-sdk/groq`,
    `generateText`) writes in the user's voice using `style.md` + past samples.
    Gemini = brains (structure), Groq = voice (prose).

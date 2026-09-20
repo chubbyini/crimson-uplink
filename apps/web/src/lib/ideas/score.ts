@@ -27,7 +27,7 @@ export async function scoreIdeas(apiKey: string, items: ScorableItem[]) {
     schema: IdeasSchema,
     system:
       "You curate content ideas for a developer who posts on LinkedIn, X, and Dev.to. " +
-      "Pick the 5 items with the best mix of timeliness, substance, and fit for a practitioner's audience. " +
+      "Pick the 10 items with the best mix of timeliness, substance, and fit for a practitioner's audience. " +
       "Each idea needs a concrete angle — never a generic summary. " +
       "Suggested format: linkedin for opinionated takes, x for newsy/one-chart items, devto for deep technical topics.",
     prompt: `Fresh items:\n${lines.join("\n")}`,
