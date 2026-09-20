@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Tailwind v4 defaults dark: to prefers-color-scheme; the layout pins
+   class="dark" on <html>, so follow the class instead. Without this, no
+   dark: style ever applies and light text renders on light cards. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #07090e;
   --foreground: #f1f5f9;
