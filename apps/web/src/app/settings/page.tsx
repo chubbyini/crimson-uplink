@@ -110,7 +110,7 @@ export default function SettingsPage() {
   }
 
   const inputCls =
-    "mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/15 dark:bg-zinc-950";
+    "mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-black dark:border-white/15 dark:bg-zinc-950 dark:text-zinc-100";
 
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-12">
