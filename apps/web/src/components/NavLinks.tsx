@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/items", label: "SOURCES" },
   { href: "/ideas", label: "IDEAS" },
+  { href: "/content", label: "CONTENT" },
   { href: "/drafts", label: "DRAFTS" },
   { href: "/analytics", label: "ANALYTICS" },
   { href: "/settings", label: "SETTINGS" },
@@ -37,7 +38,7 @@ export function MobileNav() {
   const path = usePathname();
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/95 backdrop-blur-xl sm:hidden">
-      <div className="grid grid-cols-5 font-mono text-[10px] font-medium">
+      <div className="grid grid-cols-6 font-mono text-[10px] font-medium">
         {links.map((l) => (
           <Link
             key={l.href}
