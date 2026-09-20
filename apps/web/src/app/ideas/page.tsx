@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import {
   collection,
@@ -26,6 +27,7 @@ export default function IdeasPage() {
   const [filter, setFilter] = useState<(typeof filters)[number]>("all");
   const [status, setStatus] = useState<"idle" | "loading" | "scoring" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [drafting, setDrafting] = useState<string | null>(null);
 
   async function load(u: User) {
     if (!db) return;
@@ -166,6 +168,52 @@ export default function IdeasPage() {
                   Skip
                 </button>
               </div>
+            )}
+            {idea.status === "approved" && (
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    if (!user) return;
+                    setDrafting(idea.id);
+                    setError(null);
+                    try {
+                      const token = await user.getIdToken();
+                      const res = await fetch("/api/drafts", {
+                        method: "POST",
+                        headers: {
+                          authorization: `Bearer ${token}`,
+                          "content-type": "application/json",
+                        },
+                        body: JSON.stringify({ ideaId: idea.id }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error ?? "Draft failed");
+                      setRows((rs) =>
+                        rs.map((r) =>
+                          r.id === idea.id ? { ...r, status: "drafted" } : r
+                        )
+                      );
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Draft failed");
+                    } finally {
+                      setDrafting(null);
+                    }
+                  }}
+                  disabled={drafting === idea.id}
+                  className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-800 disabled:opacity-50"
+                >
+                  {drafting === idea.id ? "Drafting…" : "Draft with Groq"}
+                </button>
+              </div>
+            )}
+            {idea.status === "drafted" && (
+              <p className="mt-3 text-xs text-zinc-500">
+                Drafted — see the{" "}
+                <Link href="/drafts" className="underline">
+                  drafts page
+                </Link>
+                .
+              </p>
             )}
           </li>
         ))}
