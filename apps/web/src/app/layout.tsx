@@ -69,6 +69,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="flex items-center gap-4">
             <nav className="hidden sm:flex items-center gap-4 font-mono text-xs font-medium">
               <Link
+                href="/items"
+                className="text-slate-400 hover:text-sky-400 transition-colors"
+              >
+                SOURCES
+              </Link>
+              <Link
+                href="/ideas"
+                className="text-slate-400 hover:text-sky-400 transition-colors"
+              >
+                IDEAS
+              </Link>
+              <Link
+                href="/drafts"
+                className="text-slate-400 hover:text-sky-400 transition-colors"
+              >
+                DRAFTS
+              </Link>
+              <Link
                 href="/settings"
                 className="text-slate-400 hover:text-sky-400 transition-colors"
               >
