@@ -135,7 +135,7 @@ export default function DraftsPage() {
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 onClick={() => copy(d.id, d.body)}
-                className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
+                className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
               >
                 {copied === d.id ? "Copied ✓" : "Copy text"}
               </button>
@@ -149,7 +149,7 @@ export default function DraftsPage() {
                   </button>
                   <button
                     onClick={() => setDraftStatus(d.id, "rejected")}
-                    className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
+                    className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
                   >
                     Reject
                   </button>

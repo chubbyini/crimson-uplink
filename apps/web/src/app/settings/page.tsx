@@ -293,7 +293,7 @@ export default function SettingsPage() {
               setIngesting(false);
             }
           }}
-          className="mt-3 flex h-10 items-center rounded-full border border-black/10 px-5 text-sm font-medium hover:bg-black/5 disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/10"
+          className="mt-3 flex h-10 items-center rounded-full border border-black/10 px-5 text-sm font-medium text-slate-700 hover:bg-black/5 disabled:opacity-50 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
         >
           {ingesting ? "Ingesting…" : "Run ingest now"}
         </button>

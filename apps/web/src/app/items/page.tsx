@@ -97,7 +97,7 @@ export default function ItemsPage() {
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               filter === s
                 ? "bg-red-700 text-white"
-                : "border border-black/10 hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
+                : "border border-black/10 text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
             }`}
           >
             {s}

@@ -127,7 +127,7 @@ export default function IdeasPage() {
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               filter === f
                 ? "bg-red-700 text-white"
-                : "border border-black/10 hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
+                : "border border-black/10 text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
             }`}
           >
             {f}
@@ -163,7 +163,7 @@ export default function IdeasPage() {
                 </button>
                 <button
                   onClick={() => setIdeaStatus(idea.id, "skipped")}
-                  className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
+                  className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
                 >
                   Skip
                 </button>
