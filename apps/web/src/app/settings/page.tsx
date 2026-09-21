@@ -288,9 +288,16 @@ export default function SettingsPage() {
                 method: "POST",
                 headers: { authorization: `Bearer ${token}` },
               });
-              const data = await res.json();
-              if (!res.ok) throw new Error(data.error ?? "Ingest failed");
-              setIngest(data);
+              let data: { error?: string; [key: string]: unknown } = {};
+              try {
+                data = await res.json();
+              } catch {
+                throw new Error(
+                  `Ingest server error (HTTP ${res.status}: ${res.statusText || "Empty or invalid server response"})`
+                );
+              }
+              if (!res.ok) throw new Error(data.error ?? `Ingest failed (HTTP ${res.status})`);
+              setIngest(data as Parameters<typeof setIngest>[0]);
             } catch (e) {
               setError(e instanceof Error ? e.message : "Ingest failed");
             } finally {

@@ -94,12 +94,31 @@ export default function Dashboard({ user }: { user: User }) {
       const token = await user.getIdToken();
       const authHeader = { authorization: `Bearer ${token}` };
       const ing = await fetch("/api/ingest", { method: "POST", headers: authHeader });
-      const ingData = await ing.json();
-      if (!ing.ok) throw new Error(ingData.error ?? "Ingest failed");
+      let ingData: { error?: string; [key: string]: unknown } = {};
+      try {
+        ingData = await ing.json();
+      } catch {
+        throw new Error(
+          `Ingest server error (HTTP ${ing.status}: ${ing.statusText || "Empty or invalid server response"})`
+        );
+      }
+      if (!ing.ok) throw new Error(ingData.error ?? `Ingest failed (HTTP ${ing.status})`);
+
       const sc = await fetch("/api/ideas", { method: "POST", headers: authHeader });
-      const scData = await sc.json();
-      if (!sc.ok) throw new Error(scData.error ?? "Scoring failed");
-      setResult({ ingest: ingData, ideas: scData, telegram: scData.telegram });
+      let scData: { error?: string; telegram?: { sent: boolean; reason?: string }; [key: string]: unknown } = {};
+      try {
+        scData = await sc.json();
+      } catch {
+        throw new Error(
+          `Scoring server error (HTTP ${sc.status}: ${sc.statusText || "Empty or invalid server response"})`
+        );
+      }
+      if (!sc.ok) throw new Error(scData.error ?? `Scoring failed (HTTP ${sc.status})`);
+      setResult({
+        ingest: ingData as unknown as PipeResult["ingest"],
+        ideas: scData as unknown as PipeResult["ideas"],
+        telegram: scData.telegram,
+      });
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Pipeline failed");

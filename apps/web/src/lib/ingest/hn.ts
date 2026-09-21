@@ -14,6 +14,7 @@ interface HnHit {
 export async function fetchHnFrontPage(limit = 30): Promise<RawItem[]> {
   const res = await fetch("https://hn.algolia.com/api/v1/search?tags=front_page", {
     next: { revalidate: 0 },
+    signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`HN Algolia API failed: ${res.status}`);
   const data = (await res.json()) as { hits?: HnHit[] };

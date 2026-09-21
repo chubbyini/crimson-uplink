@@ -20,7 +20,8 @@ export async function fetchDevtoByTags(
     if (!t) continue;
     try {
       const res = await fetch(
-        `https://dev.to/api/articles?tag=${encodeURIComponent(t)}&top=7&per_page=${perTag}`
+        `https://dev.to/api/articles?tag=${encodeURIComponent(t)}&top=7&per_page=${perTag}`,
+        { signal: AbortSignal.timeout(8000) }
       );
       if (!res.ok) continue;
       const articles = (await res.json()) as DevtoArticle[];

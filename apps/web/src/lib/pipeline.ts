@@ -18,6 +18,16 @@ export interface StoreResult {
   seenBefore: number;
 }
 
+function cleanDoc<T extends Record<string, unknown>>(obj: T): T {
+  const clean: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) {
+      clean[k] = v;
+    }
+  }
+  return clean as T;
+}
+
 /** Dedupe-store raw items into users/{uid}/items (hash doc IDs). Shared. */
 export async function storeItems(
   db: Firestore,
@@ -34,32 +44,50 @@ export async function storeItems(
       // Unparseable URL — skip.
     }
   }
-  const snaps = refs.size
-    ? await db.getAll(...[...refs.keys()].map((h) => db.doc(`users/${uid}/items/${h}`)))
-    : [];
-  const existing = new Set(snaps.filter((s) => s.exists).map((s) => s.id));
 
-  const batch = db.batch();
-  let added = 0;
-  for (const [hash, item] of refs) {
-    if (existing.has(hash)) {
-      batch.set(
-        db.doc(`users/${uid}/items/${hash}`),
-        { lastSeenAt: now },
-        { merge: true }
-      );
-    } else {
-      batch.set(db.doc(`users/${uid}/items/${hash}`), {
-        ...item,
-        ...extra,
-        hash,
-        firstSeenAt: now,
-        lastSeenAt: now,
-      });
-      added += 1;
+  // Chunk db.getAll to max 250 references per call
+  const allHashes = [...refs.keys()];
+  const existing = new Set<string>();
+  const GET_CHUNK = 250;
+  for (let i = 0; i < allHashes.length; i += GET_CHUNK) {
+    const chunk = allHashes.slice(i, i + GET_CHUNK);
+    const snaps = await db.getAll(...chunk.map((h) => db.doc(`users/${uid}/items/${h}`)));
+    for (const snap of snaps) {
+      if (snap.exists) existing.add(snap.id);
     }
   }
-  if (refs.size) await batch.commit();
+
+  // Chunk batch writes to max 400 operations (Firestore batch max is 500)
+  const BATCH_CHUNK = 400;
+  const entries = [...refs.entries()];
+  let added = 0;
+
+  for (let i = 0; i < entries.length; i += BATCH_CHUNK) {
+    const chunk = entries.slice(i, i + BATCH_CHUNK);
+    const batch = db.batch();
+    for (const [hash, item] of chunk) {
+      const docRef = db.doc(`users/${uid}/items/${hash}`);
+      if (existing.has(hash)) {
+        batch.set(
+          docRef,
+          cleanDoc({ lastSeenAt: now }),
+          { merge: true }
+        );
+      } else {
+        const itemDoc = cleanDoc({
+          ...item,
+          ...extra,
+          hash,
+          firstSeenAt: now,
+          lastSeenAt: now,
+        });
+        batch.set(docRef, itemDoc);
+        added += 1;
+      }
+    }
+    await batch.commit();
+  }
+
   return { unique: refs.size, added, seenBefore: refs.size - added };
 }
 
@@ -127,7 +155,7 @@ export async function scoreForUser(
   const batch = db.batch();
   const ids = ideas.map((idea) => {
     const ref = db.collection(`users/${uid}/ideas`).doc();
-    batch.set(ref, { ...idea, status: "new", createdAt: now });
+    batch.set(ref, cleanDoc({ ...idea, status: "new", createdAt: now }));
     return ref.id;
   });
   await batch.commit();

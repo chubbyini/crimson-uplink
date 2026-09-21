@@ -1,7 +1,7 @@
 import Parser from "rss-parser";
 import type { RawItem } from "./types";
 
-const parser = new Parser({ timeout: 15000 });
+const parser = new Parser({ timeout: 8000 });
 
 async function fetchFeed(url: string, source: RawItem["source"]): Promise<RawItem[]> {
   const feed = await parser.parseURL(url);

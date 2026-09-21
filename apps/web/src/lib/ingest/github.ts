@@ -25,6 +25,7 @@ export async function fetchTrendingRepos(
         "X-GitHub-Api-Version": "2022-11-28",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
+      signal: AbortSignal.timeout(8000),
     }
   );
   if (!res.ok) throw new Error(`GitHub search failed: ${res.status}`);

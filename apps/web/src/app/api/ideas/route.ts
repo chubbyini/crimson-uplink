@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { adminAuth, adminDb, isAdminConfigured } from "@/lib/firebase-admin";
 import { loadSettings, scoreForUser } from "@/lib/pipeline";
 
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 /**
  * POST /api/ideas — score the user's freshest items into a top-10 idea bank.
  * Auth: Firebase ID token in `Authorization: Bearer <token>`.

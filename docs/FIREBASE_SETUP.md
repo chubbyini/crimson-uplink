@@ -13,7 +13,7 @@
 6. Run `cd apps/web; npm install; npm run dev` → header shows
    **Sign in with Google** (or **Connect Firebase** until env is set).
 
-7. Server key (needed for ingest + cron API routes): Project settings →
+7. Server key (   needed for ingest + cron API routes): Project settings →
    **Service accounts** → Generate new private key → paste the whole JSON on
    ONE line as `FIREBASE_SERVICE_ACCOUNT_JSON` in `apps/web/.env.local`
    (and later in hosting env). Never commit it.
