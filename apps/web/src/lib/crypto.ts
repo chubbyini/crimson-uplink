@@ -30,15 +30,17 @@ export function encryptField(plaintext: string): string {
   return `enc:${iv.toString("hex")}:${authTag}:${encrypted}`;
 }
 
-/** Decrypt a sensitive text string using AES-256-GCM (backward-compatible with plaintext). */
+/** Decrypt a sensitive text string using AES-256-GCM (backward-compatible with legacy unencrypted keys). */
 export function decryptField(ciphertext: string): string {
   if (!ciphertext || !ciphertext.startsWith("enc:")) {
-    return ciphertext || ""; // Backward compatibility for legacy plaintext keys
+    return ciphertext || ""; // Backward compatibility for legacy unencrypted plaintext keys
   }
 
   try {
     const parts = ciphertext.split(":");
-    if (parts.length !== 4) return ciphertext;
+    if (parts.length !== 4) {
+      throw new Error(`Invalid ciphertext format: expected 4 colon-separated parts, got ${parts.length}`);
+    }
 
     const [, ivHex, authTagHex, encryptedHex] = parts;
     const iv = Buffer.from(ivHex, "hex");
@@ -52,8 +54,9 @@ export function decryptField(ciphertext: string): string {
     decrypted += decipher.final("utf8");
     return decrypted;
   } catch (e) {
-    console.error("Decryption failed:", e);
-    return "";
+    const errMessage = e instanceof Error ? e.message : String(e);
+    console.error(`[CRYPTO ERROR] Decryption failed for payload "${ciphertext.slice(0, 20)}...": ${errMessage}`);
+    throw new Error(`[CRYPTO ERROR] Secret decryption failed: ${errMessage}`);
   }
 }
 
@@ -88,7 +91,16 @@ export function decryptSettingsSecrets<T extends Record<string, unknown>>(settin
   const result = { ...settings };
   for (const field of SECRET_FIELDS) {
     if (typeof result[field] === "string") {
-      (result as Record<string, unknown>)[field] = decryptField(result[field] as string);
+      try {
+        (result as Record<string, unknown>)[field] = decryptField(result[field] as string);
+      } catch (e) {
+        // Loud but non-fatal: keep the original ciphertext so a single corrupt
+        // field can't 500 every route (loadSettings feeds all of them), and a
+        // later re-save re-encrypts cleanly (encryptField passes enc: through).
+        console.error(
+          `[CRYPTO ERROR] Skipping undecryptable field "${field}": ${e instanceof Error ? e.message : e}`
+        );
+      }
     }
   }
   return result as T;
@@ -99,8 +111,16 @@ export function maskSettingsSecrets<T extends Record<string, unknown>>(settings:
   const result = { ...settings };
   for (const field of SECRET_FIELDS) {
     if (typeof result[field] === "string" && result[field]) {
-      const plain = decryptField(result[field] as string);
-      (result as Record<string, unknown>)[field] = maskSecret(plain);
+      try {
+        const plain = decryptField(result[field] as string);
+        (result as Record<string, unknown>)[field] = maskSecret(plain);
+      } catch (e) {
+        // Never fail a read over one bad field — mask it and shout instead.
+        console.error(
+          `[CRYPTO ERROR] Masking undecryptable field "${field}": ${e instanceof Error ? e.message : e}`
+        );
+        (result as Record<string, unknown>)[field] = "••••••••";
+      }
     }
   }
   return result as T;

@@ -32,11 +32,8 @@ Pipeline: `sources → items → ideas → drafts → approval → refine → pu
 - **Firebase** provides Auth (Google), Firestore (all state), nothing else.
 - **Vercel** hosts the app, runs the 06:00 cron, receives the Telegram webhook.
 - Repo root is an npm workspaces monorepo; the lockfile lives at the root.
-- **`scripts/` (experimental, undecided):** a standalone `scripts/package.json`
-  (`firebase-admin` + `rss-parser`, `node ingest.mjs`) sketches a GitHub
-  Actions/local worker doing the same ingest outside Next.js. It duplicates
-  `lib/ingest` + `lib/pipeline` logic today — adopt it as the timeout-proof
-  runner or delete it before the drift hardens (§5.4).
+- `scripts/` worker experiment was removed (decision: the Vercel cron chain
+  covers scheduling; no duplicate ingest logic lives anywhere).
 
 ### 2.2 API routes (all: Node runtime, force-dynamic, 60s max)
 
@@ -55,7 +52,9 @@ Pipeline: `sources → items → ideas → drafts → approval → refine → pu
 | `/api/publish/devto` | ID token | Publish approved draft to Dev.to |
 | `/api/publish/linkedin` | ID token | Publish approved linkedin draft via Posts API |
 | `/api/stats/sync` | ID token | Refresh Dev.to views/reactions/comments |
+| `/api/corpus` + `/api/corpus/analyze` | ID token | Own-writing import + gap/follow-up/repurpose analysis |
 | `/api/cron/morning` | `CRON_SECRET` | Full loop for every enabled user |
+| `/api/cron/ingest`, `/score`, `/digest` | `CRON_SECRET` | Chained per-stage runner (timeout-proofing) |
 | `/api/telegram` | optional webhook secret | Button taps + `/topics` DMs |
 | `/api/diag`, `/api/health` | none | Env/admin health (no secret bytes), liveness |
 
@@ -228,14 +227,17 @@ items view 200). A verified morning run drew 416 fetched → 387 unique.
 
 ### P0 — Reliability
 4. Upstash Redis rate limiting (replace per-instance memory, §3.5).
-5. Cron chaining per user (416-fetch runs + 60s ceiling will meet eventually).
-6. Idempotency keys on ideas/digests (Telegram retries can double-send).
+5. Cron chaining per user landed (ingest → score → digest split routes);
+   watch 416-fetch runs against the 60s ceiling.
+6. Idempotency keys on ideas/digests landed; keep them on every new sender.
 7. `/topics` cooldown per chat (currently unbounded synchronous ~60s work).
 8. Resolve `scripts/` — adopt as timeout-proof worker or delete (drift risk).
 
 ### P1 — Quality flywheel
-9. **Own-writing corpus** (still the one unbuilt original feature): Dev.to +
-   repo markdown + LinkedIn export → gaps, follow-ups, repurposing.
+9. **Own-writing corpus — BUILT** (`/corpus`, `/api/corpus*`, voice analyzer):
+   Dev.to + RSS + manual + repo + LinkedIn CSV → gaps, follow-ups, repurposing.
+   Remaining: scheduled re-analysis inside cron; calibration from publish
+   performance (§5.11 in the original numbering).
 10. Semantic near-duplicate collapsing (the URL-hash blind spot).
 11. Scoring calibration from publish performance.
 12. Eval set for topic→idea→draft, run on every model swap.
