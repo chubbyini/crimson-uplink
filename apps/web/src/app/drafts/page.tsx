@@ -6,7 +6,6 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
   limit,

@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   collection,
-  doc,
   getDocs,
   limit,
   orderBy,
@@ -39,8 +38,6 @@ export default function IdeasPage() {
   const [tg, setTg] = useState<null | { sent: boolean; reason?: string }>(null);
   const [cursor, setCursor] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const filterRef = useRef(filter);
-  filterRef.current = filter;
 
   async function load(u: User, reset = false, activeFilter: typeof filter = filter) {
     if (!db) return;
@@ -55,7 +52,7 @@ export default function IdeasPage() {
           : [where("status", "==", activeFilter), orderBy("createdAt", "desc"), limit(PAGE_SIZE)];
         const base = query(collection(db, "users", u.uid, "ideas"), ...constraints);
         snap = await getDocs(
-          reset || !cursor || activeFilter !== filterRef.current ? base : query(base, startAfter(cursor))
+          reset || !cursor ? base : query(base, startAfter(cursor))
         );
       } catch {
         const base = query(
