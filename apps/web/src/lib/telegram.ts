@@ -69,7 +69,106 @@ export async function sendDigest(
   });
 }
 
-/** Handle Approve/Skip taps. Returns a short status for logging. */export async function handleCallback(
+/** Render and send an interactive Draft review card with Publish/Edit/Reject inline buttons. */
+export async function sendDraftCard(
+  chatId: string | number,
+  uid: string,
+  draftId: string,
+  draft: { title: string; body: string; format?: string; model?: string; linkedinBody?: string },
+  note?: string
+) {
+  const b = getBot();
+  if (!b) return;
+
+  const wordCount = draft.body.split(/\s+/).filter(Boolean).length;
+  const preview = trunc(
+    draft.body
+      .replace(/#+\s+/g, "")
+      .replace(/[*`_~>]/g, "")
+      .trim(),
+    350
+  );
+
+  const hasLi = Boolean(draft.linkedinBody);
+  const text =
+    (note ? `${note}\n\n` : "") +
+    `📝 <b>Article Draft Ready: ${esc(trunc(draft.title, 80))}</b>\n` +
+    `<i>${wordCount} words · ${esc(draft.model || "Groq")}${hasLi ? " · 💼 LinkedIn post ready" : ""}</i>\n\n` +
+    `<blockquote>${esc(preview)}</blockquote>\n\n` +
+    `Review the refined LinkedIn post, publish to Dev.to, or edit with AI:`;
+
+  await b.api.sendMessage(String(chatId), text, {
+    parse_mode: "HTML",
+    link_preview_options: { is_disabled: true },
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "💼 Review LinkedIn Post", callback_data: `dl:${uid}:${draftId}` },
+          { text: "📰 Publish to Dev.to", callback_data: `dd:${uid}:${draftId}` },
+        ],
+        [
+          { text: "✏️ Edit Article with AI", callback_data: `de:${uid}:${draftId}` },
+          { text: "❌ Reject", callback_data: `dr:${uid}:${draftId}` },
+        ],
+      ],
+    },
+  });
+}
+
+/** Render and send an interactive LinkedIn review card with Approve & Post / Edit / Back inline buttons. */
+export async function sendLinkedinCard(
+  chatId: string | number,
+  uid: string,
+  draftId: string,
+  title: string,
+  linkedinBody: string,
+  note?: string
+) {
+  const b = getBot();
+  if (!b) return;
+
+  const charCount = linkedinBody.length;
+  const preview = trunc(linkedinBody.trim(), 700);
+
+  const text =
+    (note ? `${note}\n\n` : "") +
+    `💼 <b>LinkedIn Refined Post Preview</b>\n` +
+    `<b>${esc(trunc(title, 80))}</b>\n` +
+    `<i>Length: ${charCount} / 3,000 characters</i>\n\n` +
+    `<blockquote>${esc(preview)}</blockquote>\n\n` +
+    `⚠️ <b>Approval Required:</b> Tap <b>Approve & Post</b> below to publish live to LinkedIn, or refine with AI:`;
+
+  await b.api.sendMessage(String(chatId), text, {
+    parse_mode: "HTML",
+    link_preview_options: { is_disabled: true },
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "🚀 Approve & Post to LinkedIn", callback_data: `lp:${uid}:${draftId}` },
+        ],
+        [
+          { text: "✏️ Refine LinkedIn with AI", callback_data: `le:${uid}:${draftId}` },
+          { text: "🔙 View Full Article", callback_data: `da:${uid}:${draftId}` },
+        ],
+      ],
+    },
+  });
+}
+
+/**
+ * Handle Telegram callbacks:
+ * - ia: Idea Approve -> marks approved, generates draft article + refined LinkedIn post, replies with draft card
+ * - is: Idea Skip -> marks skipped
+ * - dl: Draft LinkedIn -> shows LinkedIn review card for user approval
+ * - lp: LinkedIn Post -> user approves LinkedIn post, publishes to LinkedIn API
+ * - le: LinkedIn Edit -> sets active editing target to "linkedin" for user DM prompt
+ * - dd: Dev.to Publish -> publishes draft article directly to Dev.to API
+ * - dp: Draft Publish All -> publishes Dev.to, then prompts user to review & approve LinkedIn post
+ * - de: Draft Edit -> sets active editing target to "article" for user DM prompt
+ * - da: Draft Article -> switches view back to full article card
+ * - dr: Draft Reject -> marks draft rejected
+ */
+export async function handleCallback(
   callbackId: string,
   fromChatId: number,
   data: string
@@ -77,57 +176,461 @@ export async function sendDigest(
   const b = getBot();
   if (!b) throw new Error("Telegram not configured");
 
-  const m = data.match(/^i([as]):([^:]+):([^:]+)$/);
+  const m = data.match(/^([a-z]{2}):([^:]+):([^:]+)$/);
   if (!m) {
     await b.api.answerCallbackQuery(callbackId, { text: "Unknown action" });
     return "unknown";
   }
-  const [, action, uid, ideaId] = m;
+  const [, actionCode, uid, targetId] = m;
+  const isIdea = actionCode === "ia" || actionCode === "is";
   const { assertDocId } = await import("./validation");
-  let safeIdeaId: string;
+  let safeId: string;
   try {
-    safeIdeaId = assertDocId(ideaId, "ideaId");
+    safeId = assertDocId(targetId, isIdea ? "ideaId" : "draftId");
   } catch {
-    await b.api.answerCallbackQuery(callbackId, { text: "Invalid idea" });
+    await b.api.answerCallbackQuery(callbackId, { text: "Invalid reference" });
     return "invalid";
   }
 
-  // Dynamic import keeps firebase-admin out of edge-cold paths; lazy is fine.
   const { adminDb } = await import("./firebase-admin");
   const db = adminDb();
 
-  // Verify the tapper owns these settings (shared-bot safety).
+  // Verify sender owns these settings (shared-bot safety)
   const settingsSnap = await db.doc(`users/${uid}/settings/config`).get();
   const chatId = settingsSnap.data()?.telegramChatId as string | undefined;
   if (!chatId || String(fromChatId) !== String(chatId).trim()) {
-    await b.api.answerCallbackQuery(callbackId, { text: "Not your digest" });
+    await b.api.answerCallbackQuery(callbackId, { text: "Not your account" });
     return "forbidden";
   }
 
-  try {
-    await db.doc(`users/${uid}/ideas/${safeIdeaId}`).update({
-      status: action === "a" ? "approved" : "skipped",
-    });
-  } catch {
-    await b.api.answerCallbackQuery(callbackId, { text: "Idea no longer exists" });
-    return "gone";
+  // --- 1. IDEA ACTIONS ---
+  if (actionCode === "is") {
+    try {
+      await db.doc(`users/${uid}/ideas/${safeId}`).update({ status: "skipped" });
+    } catch {
+      await b.api.answerCallbackQuery(callbackId, { text: "Idea no longer exists" });
+      return "gone";
+    }
+    await b.api.answerCallbackQuery(callbackId, { text: "Skipped" });
+    return "skipped";
   }
-  await b.api.answerCallbackQuery(callbackId, {
-    text: action === "a" ? "Approved ✓" : "Skipped",
-  });
-  return action === "a" ? "approved" : "skipped";
+
+  if (actionCode === "ia") {
+    await b.api.answerCallbackQuery(callbackId, { text: "Approved ✓ Drafting..." });
+    try {
+      await db.doc(`users/${uid}/ideas/${safeId}`).update({ status: "approved" });
+    } catch {
+      return "gone";
+    }
+
+    const { loadSettings } = await import("./pipeline");
+    const settings = await loadSettings(db, uid);
+    if (!settings?.groqKey) {
+      await b.api.sendMessage(
+        String(fromChatId),
+        "⚠️ <b>Idea approved!</b> Add your Groq API key in Crimson Uplink → Settings to enable auto-drafting in Telegram.",
+        { parse_mode: "HTML" }
+      );
+      return "approved-no-groq";
+    }
+
+    const ideaSnap = await db.doc(`users/${uid}/ideas/${safeId}`).get();
+    if (!ideaSnap.exists) return "gone";
+    const idea = ideaSnap.data() as {
+      title: string;
+      angle: string;
+      format?: "linkedin" | "x" | "devto";
+      sourceUrls?: string[];
+    };
+
+    const progressMsg = await b.api.sendMessage(
+      String(fromChatId),
+      `⏳ <i>Drafting article + refining for LinkedIn with Groq:</i>\n<b>${esc(trunc(idea.title, 80))}</b>…`,
+      { parse_mode: "HTML" }
+    );
+
+    try {
+      const { generateDraft, refineForLinkedin } = await import("./draft/generate");
+      const draftRes = await generateDraft(settings.groqKey, {
+        title: idea.title,
+        angle: idea.angle,
+        format: idea.format || "devto",
+        sourceUrls: idea.sourceUrls || [],
+      });
+
+      let linkedinBody = "";
+      try {
+        const liRes = await refineForLinkedin(settings.groqKey, idea.title, draftRes.text);
+        linkedinBody = liRes.text;
+      } catch (err) {
+        console.warn("LinkedIn refine during draft creation failed:", err);
+      }
+
+      const now = new Date().toISOString();
+      const draftRef = db.collection(`users/${uid}/drafts`).doc();
+      await draftRef.set({
+        ideaId: safeId,
+        title: idea.title,
+        format: idea.format || "devto",
+        body: draftRes.text,
+        model: draftRes.model,
+        ...(linkedinBody ? { linkedinBody, linkedinCharCount: linkedinBody.length } : {}),
+        status: "pending_review",
+        createdAt: now,
+        updatedAt: now,
+      });
+      await db.doc(`users/${uid}/ideas/${safeId}`).update({ status: "drafted" });
+
+      try {
+        await b.api.deleteMessage(fromChatId, progressMsg.message_id);
+      } catch {}
+
+      await sendDraftCard(fromChatId, uid, draftRef.id, {
+        title: idea.title,
+        body: draftRes.text,
+        format: idea.format,
+        model: draftRes.model,
+        linkedinBody,
+      });
+      return "drafted";
+    } catch (e) {
+      try {
+        await b.api.deleteMessage(fromChatId, progressMsg.message_id);
+      } catch {}
+      const errMsg = e instanceof Error ? e.message : "Draft generation failed";
+      await b.api.sendMessage(
+        String(fromChatId),
+        `❌ <b>Drafting failed:</b> ${esc(errMsg)}`,
+        { parse_mode: "HTML" }
+      );
+      return "draft-failed";
+    }
+  }
+
+  // --- 2. DRAFT ACTIONS ---
+  if (actionCode === "dr") {
+    try {
+      await db.doc(`users/${uid}/drafts/${safeId}`).update({
+        status: "rejected",
+        updatedAt: new Date().toISOString(),
+      });
+    } catch {
+      await b.api.answerCallbackQuery(callbackId, { text: "Draft no longer exists" });
+      return "gone";
+    }
+    await b.api.answerCallbackQuery(callbackId, { text: "Draft rejected" });
+    await b.api.sendMessage(String(fromChatId), "❌ <b>Draft marked as rejected.</b>", { parse_mode: "HTML" });
+    return "rejected";
+  }
+
+  if (actionCode === "da") {
+    await b.api.answerCallbackQuery(callbackId, { text: "Viewing article" });
+    const draftSnap = await db.doc(`users/${uid}/drafts/${safeId}`).get();
+    if (!draftSnap.exists) return "gone";
+    const draft = draftSnap.data() as {
+      title: string;
+      body: string;
+      format?: string;
+      model?: string;
+      linkedinBody?: string;
+    };
+    await sendDraftCard(fromChatId, uid, safeId, draft);
+    return "view-article";
+  }
+
+  if (actionCode === "dl") {
+    await b.api.answerCallbackQuery(callbackId, { text: "Loading LinkedIn preview" });
+    const draftSnap = await db.doc(`users/${uid}/drafts/${safeId}`).get();
+    if (!draftSnap.exists) {
+      await b.api.sendMessage(String(fromChatId), "Draft not found.", { parse_mode: "HTML" });
+      return "gone";
+    }
+    const draft = draftSnap.data() as {
+      title: string;
+      body: string;
+      linkedinBody?: string;
+    };
+
+    let liBody = draft.linkedinBody;
+    if (!liBody) {
+      const { loadSettings } = await import("./pipeline");
+      const settings = await loadSettings(db, uid);
+      if (settings?.groqKey) {
+        const prog = await b.api.sendMessage(String(fromChatId), "⏳ <i>Refining for LinkedIn with Groq…</i>", { parse_mode: "HTML" });
+        try {
+          const { refineForLinkedin } = await import("./draft/generate");
+          const refined = await refineForLinkedin(settings.groqKey, draft.title, draft.body);
+          liBody = refined.text;
+          await db.doc(`users/${uid}/drafts/${safeId}`).update({
+            linkedinBody: liBody,
+            linkedinCharCount: liBody.length,
+          });
+        } finally {
+          try { await b.api.deleteMessage(fromChatId, prog.message_id); } catch {}
+        }
+      } else {
+        liBody = draft.body.slice(0, 2900);
+      }
+    }
+
+    await sendLinkedinCard(fromChatId, uid, safeId, draft.title, liBody || draft.body);
+    return "view-linkedin";
+  }
+
+  if (actionCode === "de") {
+    await b.api.answerCallbackQuery(callbackId, { text: "Send article instructions" });
+    await db.doc(`users/${uid}/settings/state`).set(
+      { activeEditDraftId: safeId, editTarget: "article", updatedAt: new Date().toISOString() },
+      { merge: true }
+    );
+    await b.api.sendMessage(
+      String(fromChatId),
+      "✏️ <b>Send instructions to edit the Article with AI:</b>\n\n" +
+        "<i>Examples:</i>\n" +
+        "• <i>\"Make it punchier and cut the intro.\"</i>\n" +
+        "• <i>\"Add code snippets for database connection pooling.\"</i>\n" +
+        "• <i>\"Focus more on latency and system trade-offs.\"</i>\n\n" +
+        "Send your prompt below (or <code>/cancel</code>):",
+      { parse_mode: "HTML" }
+    );
+    return "awaiting-edit-article";
+  }
+
+  if (actionCode === "le") {
+    await b.api.answerCallbackQuery(callbackId, { text: "Send LinkedIn instructions" });
+    await db.doc(`users/${uid}/settings/state`).set(
+      { activeEditDraftId: safeId, editTarget: "linkedin", updatedAt: new Date().toISOString() },
+      { merge: true }
+    );
+    await b.api.sendMessage(
+      String(fromChatId),
+      "✏️ <b>Send instructions to refine the LinkedIn post:</b>\n\n" +
+        "<i>Examples:</i>\n" +
+        "• <i>\"Create a more contrarian single-line hook on sentence 1.\"</i>\n" +
+        "• <i>\"Add clean bullet points with ⚡ and add #WebDev #TypeScript.\"</i>\n" +
+        "• <i>\"Shorten to under 1,800 characters for mobile readers.\"</i>\n\n" +
+        "Send your prompt below (or <code>/cancel</code>):",
+      { parse_mode: "HTML" }
+    );
+    return "awaiting-edit-linkedin";
+  }
+
+  if (actionCode === "lp") {
+    await b.api.answerCallbackQuery(callbackId, { text: "Publishing to LinkedIn..." });
+    const draftSnap = await db.doc(`users/${uid}/drafts/${safeId}`).get();
+    if (!draftSnap.exists) {
+      await b.api.sendMessage(String(fromChatId), "Draft not found.", { parse_mode: "HTML" });
+      return "gone";
+    }
+    const draft = draftSnap.data() as {
+      title: string;
+      body: string;
+      linkedinBody?: string;
+    };
+
+    const { loadSettings } = await import("./pipeline");
+    const settings = await loadSettings(db, uid);
+    if (!settings?.linkedinToken) {
+      await b.api.sendMessage(
+        String(fromChatId),
+        "⚠️ <b>LinkedIn token not configured.</b>\nAdd your LinkedIn token in Crimson Uplink → Settings first.",
+        { parse_mode: "HTML" }
+      );
+      return "no-linkedin-token";
+    }
+
+    const progressMsg = await b.api.sendMessage(
+      String(fromChatId),
+      `⏳ <i>Posting to LinkedIn…</i>`,
+      { parse_mode: "HTML" }
+    );
+
+    const postText = draft.linkedinBody || draft.body;
+    try {
+      const { publishToLinkedin } = await import("./publish/linkedin");
+      const liRes = await publishToLinkedin(settings.linkedinToken, postText);
+      await db.collection(`users/${uid}/publishes`).add({
+        draftId: safeId,
+        title: draft.title,
+        platform: "linkedin",
+        url: liRes.url,
+        postUrn: liRes.postUrn,
+        publishedAt: new Date().toISOString(),
+      });
+      await db.doc(`users/${uid}/drafts/${safeId}`).update({
+        linkedinPublishedAt: new Date().toISOString(),
+        status: "published",
+        updatedAt: new Date().toISOString(),
+      });
+
+      try { await b.api.deleteMessage(fromChatId, progressMsg.message_id); } catch {}
+
+      await b.api.sendMessage(
+        String(fromChatId),
+        `🎉 <b>Posted to LinkedIn!</b>\n\n🔗 <a href="${esc(liRes.url)}">${esc(liRes.url)}</a>`,
+        { parse_mode: "HTML", link_preview_options: { is_disabled: false } }
+      );
+      return "linkedin-published";
+    } catch (e) {
+      try { await b.api.deleteMessage(fromChatId, progressMsg.message_id); } catch {}
+      const errMsg = e instanceof Error ? e.message : "LinkedIn publish failed";
+      await b.api.sendMessage(
+        String(fromChatId),
+        `❌ <b>LinkedIn publish failed:</b> ${esc(errMsg)}`,
+        { parse_mode: "HTML" }
+      );
+      return "linkedin-failed";
+    }
+  }
+
+  if (actionCode === "dd") {
+    await b.api.answerCallbackQuery(callbackId, { text: "Publishing to Dev.to..." });
+    const draftSnap = await db.doc(`users/${uid}/drafts/${safeId}`).get();
+    if (!draftSnap.exists) {
+      await b.api.sendMessage(String(fromChatId), "Draft not found.", { parse_mode: "HTML" });
+      return "gone";
+    }
+    const draft = draftSnap.data() as { title: string; body: string };
+
+    const { loadSettings } = await import("./pipeline");
+    const settings = await loadSettings(db, uid);
+    if (!settings?.devtoKey) {
+      await b.api.sendMessage(
+        String(fromChatId),
+        "⚠️ <b>Dev.to API key not configured.</b>\nAdd your Dev.to key in Settings first.",
+        { parse_mode: "HTML" }
+      );
+      return "no-devto-key";
+    }
+
+    const progressMsg = await b.api.sendMessage(
+      String(fromChatId),
+      `⏳ <i>Publishing to Dev.to…</i>`,
+      { parse_mode: "HTML" }
+    );
+
+    try {
+      const { publishToDevto } = await import("./publish/devto");
+      const devtoRes = await publishToDevto(settings.devtoKey, {
+        title: draft.title,
+        bodyMarkdown: draft.body,
+        published: true,
+      });
+      await db.collection(`users/${uid}/publishes`).add({
+        draftId: safeId,
+        title: draft.title,
+        platform: "devto",
+        url: devtoRes.url,
+        devtoId: devtoRes.id,
+        publishedAt: new Date().toISOString(),
+      });
+      await db.doc(`users/${uid}/drafts/${safeId}`).update({
+        devtoPublishedAt: new Date().toISOString(),
+        status: "published",
+        updatedAt: new Date().toISOString(),
+      });
+
+      try { await b.api.deleteMessage(fromChatId, progressMsg.message_id); } catch {}
+
+      await b.api.sendMessage(
+        String(fromChatId),
+        `🎉 <b>Published to Dev.to!</b>\n\n🔗 <a href="${esc(devtoRes.url)}">${esc(devtoRes.url)}</a>`,
+        { parse_mode: "HTML", link_preview_options: { is_disabled: false } }
+      );
+      return "devto-published";
+    } catch (e) {
+      try { await b.api.deleteMessage(fromChatId, progressMsg.message_id); } catch {}
+      const errMsg = e instanceof Error ? e.message : "Dev.to publish failed";
+      await b.api.sendMessage(
+        String(fromChatId),
+        `❌ <b>Dev.to publish failed:</b> ${esc(errMsg)}`,
+        { parse_mode: "HTML" }
+      );
+      return "devto-failed";
+    }
+  }
+
+  if (actionCode === "dp") {
+    await b.api.answerCallbackQuery(callbackId, { text: "Processing publish..." });
+    const draftSnap = await db.doc(`users/${uid}/drafts/${safeId}`).get();
+    if (!draftSnap.exists) {
+      await b.api.sendMessage(String(fromChatId), "Draft not found.", { parse_mode: "HTML" });
+      return "gone";
+    }
+    const draft = draftSnap.data() as {
+      title: string;
+      body: string;
+      linkedinBody?: string;
+    };
+
+    const { loadSettings } = await import("./pipeline");
+    const settings = await loadSettings(db, uid);
+    let devtoUrl: string | null = null;
+
+    if (settings?.devtoKey) {
+      const devMsg = await b.api.sendMessage(String(fromChatId), "⏳ <i>Publishing to Dev.to…</i>", { parse_mode: "HTML" });
+      try {
+        const { publishToDevto } = await import("./publish/devto");
+        const res = await publishToDevto(settings.devtoKey, {
+          title: draft.title,
+          bodyMarkdown: draft.body,
+          published: true,
+        });
+        await db.collection(`users/${uid}/publishes`).add({
+          draftId: safeId,
+          title: draft.title,
+          platform: "devto",
+          url: res.url,
+          devtoId: res.id,
+          publishedAt: new Date().toISOString(),
+        });
+        devtoUrl = res.url;
+      } catch (e) {
+        console.error("Devto auto-publish failed:", e);
+      } finally {
+        try { await b.api.deleteMessage(fromChatId, devMsg.message_id); } catch {}
+      }
+    }
+
+    // Next: Bring up LinkedIn post for MANDATORY approval before posting
+    let liBody = draft.linkedinBody;
+    if (!liBody && settings?.groqKey) {
+      const { refineForLinkedin } = await import("./draft/generate");
+      try {
+        const ref = await refineForLinkedin(settings.groqKey, draft.title, draft.body);
+        liBody = ref.text;
+        await db.doc(`users/${uid}/drafts/${safeId}`).update({
+          linkedinBody: liBody,
+          linkedinCharCount: liBody.length,
+        });
+      } catch {}
+    }
+
+    const note = devtoUrl
+      ? `✅ <b>Published to Dev.to:</b> <a href="${esc(devtoUrl)}">${esc(devtoUrl)}</a>\n\nNow, review your refined LinkedIn post before posting:`
+      : `Review your refined LinkedIn post before posting:`;
+
+    await sendLinkedinCard(fromChatId, uid, safeId, draft.title, liBody || draft.body, note);
+    return "devto-and-review-linkedin";
+  }
+
+  return "unhandled";
 }
 
 const HELP =
-  "Send <code>/topics ai, vector databases</code> and I'll research them " +
-  "across HN, GitHub, Lobsters, Stack Overflow, Dev.to and Medium, then " +
-  "reply with 10 scored ideas (approve with ✅). " +
-  "Morning digests arrive automatically at 06:00.";
+  "<b>Crimson Uplink Bot</b>\n\n" +
+  "• <code>/topics ai, rust, GPUs</code> — research topics & score ideas.\n" +
+  "• Morning digests arrive daily at 06:00 UTC.\n" +
+  "• Tap <b>✅</b> on an idea to auto-draft article + LinkedIn post.\n" +
+  "• Tap <b>💼 Review LinkedIn Post</b> to approve or refine before posting.\n" +
+  "• Tap <b>📰 Publish to Dev.to</b> to publish live directly.\n" +
+  "• Type <code>/cancel</code> anytime to abort an active edit session.";
 
 /**
- * Handle incoming DMs. /topics runs the full research → ideas → digest flow
- * for the user whose Settings chat ID matches; anything else gets HELP.
- * Note: runs synchronously inside the webhook — allow up to ~60s.
+ * Handle incoming DMs:
+ * 1. If user is in an active draft edit session, treat message as AI prompt (article or LinkedIn).
+ * 2. /topics runs the full research -> ideas -> digest flow.
+ * 3. /cancel clears active edit state.
  */
 export async function handleIncomingMessage(
   chatId: number,
@@ -144,19 +647,6 @@ export async function handleIncomingMessage(
       ...(parse ? { parse_mode: "HTML" as const } : {}),
     });
 
-  if (!text.trim().toLowerCase().startsWith("/topics")) {
-    await send(HELP);
-    return "help";
-  }
-
-  // Per-chat /topics rate limiting (max 1 request per 30 seconds)
-  const { checkRateLimit } = await import("./rate-limit");
-  const rate = checkRateLimit(`tg:${chatId}`, 1, 30000);
-  if (!rate.success) {
-    await send("⏳ Please wait 30 seconds between <b>/topics</b> research queries.", true);
-    return "rate-limited";
-  }
-
   // Which user owns this chat? (shared-bot safety)
   const owners = await db
     .collectionGroup("settings")
@@ -171,6 +661,169 @@ export async function handleIncomingMessage(
     return "unknown-chat";
   }
   const uid = owners.docs[0].ref.parent.parent!.id;
+
+  // Handle /cancel
+  if (text.trim().toLowerCase() === "/cancel") {
+    await db.doc(`users/${uid}/settings/state`).set({ activeEditDraftId: null, editTarget: null }, { merge: true });
+    await send("Edit session cancelled.");
+    return "cancelled";
+  }
+
+  // Check if user is in an active edit session for a draft
+  const stateSnap = await db.doc(`users/${uid}/settings/state`).get();
+  const activeDraftId = stateSnap.data()?.activeEditDraftId as string | undefined;
+  const editTarget = stateSnap.data()?.editTarget as string | undefined;
+
+  if (activeDraftId && !text.trim().startsWith("/")) {
+    const draftSnap = await db.doc(`users/${uid}/drafts/${activeDraftId}`).get();
+    if (draftSnap.exists) {
+      const draft = draftSnap.data() as {
+        title: string;
+        body: string;
+        format?: string;
+        model?: string;
+        linkedinBody?: string;
+      };
+      const { loadSettings } = await import("./pipeline");
+      const settings = await loadSettings(db, uid);
+
+      if (!settings?.groqKey) {
+        await send("⚠️ Add your Groq API key in Settings to use AI editing.", false);
+        return "no-groq-key";
+      }
+
+      // Clear edit state
+      await db.doc(`users/${uid}/settings/state`).set({ activeEditDraftId: null, editTarget: null }, { merge: true });
+
+      // Branch 1: Editing LinkedIn Refined Post
+      if (editTarget === "linkedin") {
+        const prog = await b.api.sendMessage(
+          String(chatId),
+          `⏳ <i>Refining LinkedIn post with Groq:</i>\n"${esc(trunc(text, 100))}"…`,
+          { parse_mode: "HTML" }
+        );
+
+        try {
+          const { generateText } = await import("ai");
+          const { createGroq } = await import("@ai-sdk/groq");
+          const groq = createGroq({ apiKey: settings.groqKey });
+          const modelName = process.env.GROQ_MODEL ?? "openai/gpt-oss-120b";
+
+          const currentContent = draft.linkedinBody || draft.body;
+          const { text: refinedText } = await generateText({
+            model: groq(modelName),
+            system: "You are an elite LinkedIn tech influencer and ghostwriter.",
+            prompt: [
+              `Refine the following LinkedIn post according strictly to the user's instructions.`,
+              `STRICT CONSTRAINTS:`,
+              `1. The total text MUST be STRICTLY UNDER 3000 CHARACTERS.`,
+              `2. High engagement: strong opening hook, double-spaced paragraphs, bullet points, CTA question, 3-5 developer hashtags.`,
+              ``,
+              `--- CURRENT LINKEDIN POST ---`,
+              currentContent,
+              ``,
+              `--- USER INSTRUCTIONS ---`,
+              text,
+              ``,
+              `Return ONLY the complete updated LinkedIn post.`,
+            ].join("\n"),
+            maxOutputTokens: 2500,
+          });
+
+          let cleaned = refinedText.trim();
+          if (cleaned.length > 2990) {
+            cleaned = cleaned.slice(0, 2985) + "…\n\n#Tech #WebDev";
+          }
+
+          const now = new Date().toISOString();
+          await db.doc(`users/${uid}/drafts/${activeDraftId}`).update({
+            linkedinBody: cleaned,
+            linkedinCharCount: cleaned.length,
+            editedAt: now,
+            updatedAt: now,
+          });
+
+          try { await b.api.deleteMessage(chatId, prog.message_id); } catch {}
+
+          await sendLinkedinCard(
+            chatId,
+            uid,
+            activeDraftId,
+            draft.title,
+            cleaned,
+            "✨ <b>LinkedIn post updated with your instructions!</b>"
+          );
+          return "linkedin-edited";
+        } catch (e) {
+          try { await b.api.deleteMessage(chatId, prog.message_id); } catch {}
+          await send(`❌ <b>LinkedIn editing failed:</b> ${esc(e instanceof Error ? e.message : "unknown")}`);
+          return "edit-failed";
+        }
+      }
+
+      // Branch 2: Editing Full Article Draft
+      const prog = await b.api.sendMessage(
+        String(chatId),
+        `⏳ <i>Refining article draft with Groq:</i>\n"${esc(trunc(text, 100))}"…`,
+        { parse_mode: "HTML" }
+      );
+
+      try {
+        const { editDraftWithGroq, refineForLinkedin } = await import("./draft/generate");
+        const edited = await editDraftWithGroq(settings.groqKey, draft.body, text);
+        
+        let newLiBody = draft.linkedinBody;
+        try {
+          const liRef = await refineForLinkedin(settings.groqKey, draft.title, edited.text);
+          newLiBody = liRef.text;
+        } catch {}
+
+        const now = new Date().toISOString();
+        await db.doc(`users/${uid}/drafts/${activeDraftId}`).update({
+          body: edited.text,
+          model: edited.model,
+          ...(newLiBody ? { linkedinBody: newLiBody, linkedinCharCount: newLiBody.length } : {}),
+          editedAt: now,
+          updatedAt: now,
+        });
+
+        try { await b.api.deleteMessage(chatId, prog.message_id); } catch {}
+
+        await sendDraftCard(
+          chatId,
+          uid,
+          activeDraftId,
+          {
+            title: draft.title,
+            body: edited.text,
+            format: draft.format,
+            model: edited.model,
+            linkedinBody: newLiBody,
+          },
+          "✨ <b>Article draft updated with your instructions!</b>"
+        );
+        return "draft-edited";
+      } catch (e) {
+        try { await b.api.deleteMessage(chatId, prog.message_id); } catch {}
+        await send(`❌ <b>Editing failed:</b> ${esc(e instanceof Error ? e.message : "unknown")}`);
+        return "edit-failed";
+      }
+    }
+  }
+
+  // Handle /topics or general commands
+  if (!text.trim().toLowerCase().startsWith("/topics")) {
+    await send(HELP);
+    return "help";
+  }
+
+  // Per-chat /topics rate limiting (max 1 request per 30 seconds)
+  const { checkRateLimit } = await import("./rate-limit");
+  const rate = checkRateLimit(`tg:${chatId}`, 1, 30000);
+  if (!rate.success) {
+    await send("⏳ Please wait 30 seconds between <b>/topics</b> research queries.", true);
+    return "rate-limited";
+  }
 
   const topics = text
     .replace(/^\/topics(@\w+)?/i, "")
