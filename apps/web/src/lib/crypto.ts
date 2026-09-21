@@ -2,10 +2,16 @@ import crypto from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
 
-/** Get or derive a 32-byte master encryption key. */
+/** Get the 32-byte master encryption key. Fail CLOSED when unset. */
 function getMasterKey(): Buffer {
-  const envKey = process.env.ENCRYPTION_KEY || process.env.FIREBASE_PROJECT_ID || "crimson-uplink-secret-key-default-salt-2026";
-  return crypto.createHash("sha256").update(envKey).digest();
+  const envKey = process.env.ENCRYPTION_KEY;
+  if (!envKey || envKey.trim() === "") {
+    throw new Error(
+      "ENCRYPTION_KEY is not set — refusing to encrypt with a fallback key. " +
+        "See apps/web/.env.example."
+    );
+  }
+  return crypto.createHash("sha256").update(envKey.trim()).digest();
 }
 
 /** Encrypt a sensitive text string using AES-256-GCM. */
