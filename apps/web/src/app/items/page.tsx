@@ -9,6 +9,8 @@ import {
   limit,
   orderBy,
   query,
+  startAfter,
+  type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 
@@ -31,8 +33,33 @@ export default function ItemsPage() {
   const router = useRouter();
   const [rows, setRows] = useState<ItemRow[]>([]);
   const [filter, setFilter] = useState("all");
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "loading-more" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+
+  const PAGE = 100;
+
+  async function loadPage(u: User, reset = false, after: QueryDocumentSnapshot | null = null) {
+    if (!db) return;
+    setStatus(reset ? "loading" : "loading-more");
+    try {
+      const base = query(
+        collection(db, "users", u.uid, "items"),
+        orderBy("lastSeenAt", "desc"),
+        limit(PAGE)
+      );
+      const snap = await getDocs(after ? query(base, startAfter(after)) : base);
+      const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ItemRow, "id">) }));
+      setRows((rs) => (reset ? docs : [...rs, ...docs]));
+      setCursor(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.size === PAGE);
+      setStatus("idle");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load items");
+      setStatus("error");
+    }
+  }
 
   useEffect(() => {
     if (!auth) return;
@@ -40,23 +67,10 @@ export default function ItemsPage() {
       setUser(u);
       if (!u) router.replace("/");
       if (u && db) {
-        setStatus("loading");
-        try {
-          const snap = await getDocs(
-            query(
-              collection(db, "users", u.uid, "items"),
-              orderBy("lastSeenAt", "desc"),
-              limit(200)
-            )
-          );
-          setRows(
-            snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ItemRow, "id">) }))
-          );
-          setStatus("idle");
-        } catch (e) {
-          setError(e instanceof Error ? e.message : "Failed to load items");
-          setStatus("error");
-        }
+        setRows([]);
+        setCursor(null);
+        setHasMore(true);
+        await loadPage(u, true);
       }
     });
   }, []);
@@ -88,9 +102,10 @@ export default function ItemsPage() {
     <main className="mx-auto w-full max-w-3xl px-6 py-12">
       <h1 className="text-2xl font-semibold">Sources</h1>
       <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-        {rows.length} articles ingested. Run more from Settings → Run ingest
+        {rows.length} articles loaded{hasMore ? " (more available)" : ""}. Run more from Settings → Run ingest
         now.
       </p>
+      {status === "loading" && <p className="mt-3 text-sm text-zinc-500">Loading sources…</p>}
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
         {sources.map((s) => (
@@ -141,6 +156,15 @@ export default function ItemsPage() {
         <p className="mt-6 text-sm text-zinc-500">
           Nothing here yet — run ingest from Settings.
         </p>
+      )}
+      {hasMore && user && (
+        <button
+          onClick={() => void loadPage(user, false, cursor)}
+          disabled={status === "loading-more"}
+          className="mt-6 rounded-full border border-black/10 px-4 py-2 text-sm font-medium disabled:opacity-50 dark:border-white/15"
+        >
+          {status === "loading-more" ? "Loading…" : "Load more"}
+        </button>
       )}
     </main>
   );

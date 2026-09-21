@@ -99,17 +99,28 @@ export default function AnalyticsPage() {
   async function saveManual(id: string) {
     if (!user || !db) return;
     const e = edits[id];
+    const parseNum = (s: string): number | null => {
+      if (s.trim() === "") return null;
+      const n = Number(s);
+      return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+    };
+    const views = parseNum(e.views);
+    const likes = parseNum(e.likes);
+    if ((e.views.trim() !== "" && views === null) || (e.likes.trim() !== "" && likes === null)) {
+      setError("Views/likes must be numbers 0 or higher");
+      return;
+    }
     await updateDoc(doc(db, "users", user.uid, "publishes", id), {
-      manualViews: e.views === "" ? null : Number(e.views),
-      manualLikes: e.likes === "" ? null : Number(e.likes),
+      manualViews: views,
+      manualLikes: likes,
     });
     setRows((rs) =>
       rs.map((r) =>
         r.id === id
           ? {
               ...r,
-              manualViews: e.views === "" ? undefined : Number(e.views),
-              manualLikes: e.likes === "" ? undefined : Number(e.likes),
+              manualViews: views ?? undefined,
+              manualLikes: likes ?? undefined,
             }
           : r
       )

@@ -81,15 +81,13 @@ export default function DraftsPage() {
           limit(30)
         )
       );
+      // Read-only: never delete inside a read. Published/rejected are hidden;
+      // delete explicitly via the Delete button (server route).
       const activeDocs: DraftRow[] = [];
       for (const d of snap.docs) {
         const data = d.data() as Omit<DraftRow, "id">;
-        // Clean up legacy published or rejected items
-        if (data.status === "published" || data.status === "rejected") {
-          void deleteDoc(doc(db, "users", u.uid, "drafts", d.id));
-        } else {
-          activeDocs.push({ id: d.id, ...data });
-        }
+        if (data.status === "published" || data.status === "rejected") continue;
+        activeDocs.push({ id: d.id, ...data });
       }
       setRows(activeDocs);
       setStatus("idle");
@@ -156,7 +154,24 @@ export default function DraftsPage() {
   }
 
   async function copy(id: string, body: string) {
-    await navigator.clipboard.writeText(body);
+    try {
+      await navigator.clipboard.writeText(body);
+    } catch {
+      // Clipboard API needs HTTPS/focus — fallback to textarea + execCommand.
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = body;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch {
+        setError("Copy failed — select the text manually");
+        return;
+      }
+    }
     setCopied(id);
     setTimeout(() => setCopied((c) => (c === id ? null : c)), 2000);
   }

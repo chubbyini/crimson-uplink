@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -12,7 +12,7 @@ import {
   orderBy,
   query,
   startAfter,
-  updateDoc,
+  where,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
@@ -39,19 +39,34 @@ export default function IdeasPage() {
   const [tg, setTg] = useState<null | { sent: boolean; reason?: string }>(null);
   const [cursor, setCursor] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
 
-  async function load(u: User, reset = false) {
+  async function load(u: User, reset = false, activeFilter: typeof filter = filter) {
     if (!db) return;
     setStatus("loading");
     try {
-      const base = query(
-        collection(db, "users", u.uid, "ideas"),
-        orderBy("createdAt", "desc"),
-        limit(PAGE_SIZE)
-      );
-      const snap = await getDocs(
-        reset || !cursor ? base : query(base, startAfter(cursor))
-      );
+      // Server-side filter when possible (needs composite index on status+createdAt);
+      // fall back to client filter if Firestore rejects the query.
+      let snap;
+      try {
+        const constraints = activeFilter === "all"
+          ? [orderBy("createdAt", "desc"), limit(PAGE_SIZE)]
+          : [where("status", "==", activeFilter), orderBy("createdAt", "desc"), limit(PAGE_SIZE)];
+        const base = query(collection(db, "users", u.uid, "ideas"), ...constraints);
+        snap = await getDocs(
+          reset || !cursor || activeFilter !== filterRef.current ? base : query(base, startAfter(cursor))
+        );
+      } catch {
+        const base = query(
+          collection(db, "users", u.uid, "ideas"),
+          orderBy("createdAt", "desc"),
+          limit(PAGE_SIZE)
+        );
+        snap = await getDocs(
+          reset || !cursor ? base : query(base, startAfter(cursor))
+        );
+      }
       const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as StoredIdea) }));
       setRows((rs) => (reset ? docs : [...rs, ...docs]));
       setCursor(snap.docs[snap.docs.length - 1] ?? null);
@@ -163,7 +178,11 @@ export default function IdeasPage() {
         {filters.map((f) => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => {
+              setFilter(f);
+              setCursor(null);
+              if (user) void load(user, true, f);
+            }}
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               filter === f
                 ? "bg-red-700 text-white"
@@ -266,8 +285,9 @@ export default function IdeasPage() {
       {visible.length > 0 && (
         <div className="mt-6 flex flex-col items-center gap-2">
           <p className="text-xs text-zinc-500">
-            Showing {visible.length} of your bank
+            Showing {visible.length} loaded ideas
             {filter !== "all" ? ` (filtered: ${filter})` : ""}
+            {hasMore ? " — load more for the full bank" : ""}
           </p>
           {hasMore && (
             <button
