@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminAuth, adminDb, isAdminConfigured } from "@/lib/firebase-admin";
+import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { loadSettings, scoreForUser } from "@/lib/pipeline";
 
 export const maxDuration = 60;
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
   let uid: string;
   try {
-    uid = (await adminAuth().verifyIdToken(token)).uid;
+    uid = await verifyFirebaseToken(token);
   } catch (e) {
     const reason =
       e instanceof Error ? e.message.split("\n")[0] : "Invalid ID token";

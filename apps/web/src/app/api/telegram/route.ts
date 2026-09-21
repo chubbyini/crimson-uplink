@@ -6,6 +6,10 @@ import {
   isTelegramConfigured,
 } from "@/lib/telegram";
 
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 /**
  * POST /api/telegram — Telegram webhook: digest button taps (callback_query)
  * and DMs (/topics research, /start help).
