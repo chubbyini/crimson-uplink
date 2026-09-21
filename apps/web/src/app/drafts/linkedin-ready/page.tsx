@@ -2,10 +2,11 @@
 
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { useRouter, useSearchParams } from "next/navigation";
+import { type User } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, updateDoc } from "firebase/firestore";
-import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
+import { db, isFirebaseConfigured } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 
 interface DraftItem {
   id: string;
@@ -20,7 +21,8 @@ function LinkedInReadyContent() {
   const searchParams = useSearchParams();
   const initialId = searchParams.get("id");
 
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [drafts, setDrafts] = useState<DraftItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialId);
   const [currentDraft, setCurrentDraft] = useState<DraftItem | null>(null);
@@ -69,12 +71,13 @@ function LinkedInReadyContent() {
   }
 
   useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (u) void loadDrafts(u);
-    });
-  }, [initialId]);
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/");
+      return;
+    }
+    void loadDrafts(user);
+  }, [initialId, user, authLoading, router]);
 
   function handleSelectDraft(id: string) {
     setSelectedId(id);
@@ -143,6 +146,14 @@ function LinkedInReadyContent() {
     );
   }
 
+  if (authLoading) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-6 py-16">
+        <h1 className="text-2xl font-semibold">LinkedIn Ready</h1>
+        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
+      </main>
+    );
+  }
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">

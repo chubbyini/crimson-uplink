@@ -2,18 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { useState } from "react";
+import { type User } from "firebase/auth";
+import { useAuth } from "@/components/AuthProvider";
 
 /** Null while signed out (landing stays clean); user once authenticated. */
 function useSignedIn(): User | null {
-  const [user, setUser] = useState<User | null>(null);
-  useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, setUser);
-  }, []);
-  return user;
+  return useAuth().user;
 }
 
 const links = [

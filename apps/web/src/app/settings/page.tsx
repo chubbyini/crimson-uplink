@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { onAuthStateChanged, type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { auth, isFirebaseConfigured } from "@/lib/firebase";
+import { isFirebaseConfigured } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 import { emptySettings, type Settings } from "@/lib/settings";
 import { getSettings, saveSettings } from "@/lib/settings-store";
 
@@ -16,7 +16,7 @@ const fromLines = (text: string) =>
     .filter(Boolean);
 
 export default function SettingsPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [form, setForm] = useState<Settings>(emptySettings);
   const [lists, setLists] = useState({
@@ -38,38 +38,39 @@ export default function SettingsPage() {
   const [ingesting, setIngesting] = useState(false);
 
   useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (!u) router.replace("/");
-      if (u) {
-        setStatus("loading");
-        try {
-          const token = await u.getIdToken();
-          const res = await fetch("/api/settings", {
-            headers: { authorization: `Bearer ${token}` },
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error ?? "Failed to load settings");
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/");
+      return;
+    }
+    const u = user;
+    setStatus("loading");
+    (async () => {
+      try {
+        const token = await u.getIdToken();
+        const res = await fetch("/api/settings", {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to load settings");
 
-          const s = (data.settings as Settings) ?? emptySettings;
-          setForm(s);
-          setLists({
-            rssFeeds: toLines(s.rssFeeds),
-            youtubeChannelIds: toLines(s.youtubeChannelIds),
-            blueskyHandles: toLines(s.blueskyHandles),
-            mastodonHandles: toLines(s.mastodonHandles),
-            npmPackages: toLines(s.npmPackages),
-            devtoTags: toLines(s.devtoTags),
-          });
-          setStatus("idle");
-        } catch (e) {
-          setError(e instanceof Error ? e.message : "Failed to load settings");
-          setStatus("error");
-        }
+        const s = (data.settings as Settings) ?? emptySettings;
+        setForm(s);
+        setLists({
+          rssFeeds: toLines(s.rssFeeds),
+          youtubeChannelIds: toLines(s.youtubeChannelIds),
+          blueskyHandles: toLines(s.blueskyHandles),
+          mastodonHandles: toLines(s.mastodonHandles),
+          npmPackages: toLines(s.npmPackages),
+          devtoTags: toLines(s.devtoTags),
+        });
+        setStatus("idle");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load settings");
+        setStatus("error");
       }
-    });
-  }, []);
+    })();
+  }, [user, authLoading, router]);
 
   if (!isFirebaseConfigured) {
     return (
@@ -84,6 +85,14 @@ export default function SettingsPage() {
     );
   }
 
+  if (authLoading) {
+    return (
+      <main className="mx-auto w-full max-w-2xl px-6 py-16">
+        <h1 className="text-2xl font-semibold">Settings</h1>
+        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
+      </main>
+    );
+  }
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-2xl px-6 py-16">

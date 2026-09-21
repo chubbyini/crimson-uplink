@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   addDoc,
@@ -14,7 +14,8 @@ import {
   query,
   updateDoc,
 } from "firebase/firestore";
-import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
+import { db, isFirebaseConfigured } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 
 type Platform = "linkedin" | "devto" | "x" | "medium";
 
@@ -37,7 +38,7 @@ interface PublishRow {
 const platforms: Platform[] = ["linkedin", "devto", "x", "medium"];
 
 export default function AnalyticsPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [rows, setRows] = useState<PublishRow[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "syncing" | "error">("idle");
@@ -75,13 +76,13 @@ export default function AnalyticsPage() {
   }
 
   useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (!u) router.replace("/");
-      if (u) void load(u);
-    });
-  }, []);
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/");
+      return;
+    }
+    void load(user);
+  }, [user, authLoading, router]);
 
   async function logPublish(e: React.FormEvent) {
     e.preventDefault();
@@ -157,6 +158,14 @@ export default function AnalyticsPage() {
         <p className="mt-4 text-zinc-600 dark:text-zinc-400">
           Configure Firebase first (see docs/FIREBASE_SETUP.md).
         </p>
+      </main>
+    );
+  }
+  if (authLoading) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-6 py-16">
+        <h1 className="text-2xl font-semibold">Analytics</h1>
+        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
       </main>
     );
   }

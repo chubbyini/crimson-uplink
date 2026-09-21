@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   collection,
@@ -13,7 +13,8 @@ import {
   query,
   updateDoc,
 } from "firebase/firestore";
-import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
+import { db, isFirebaseConfigured } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 
 interface DraftRow {
   id: string;
@@ -27,7 +28,7 @@ interface DraftRow {
 }
 
 export default function DraftsPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [rows, setRows] = useState<DraftRow[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -97,13 +98,13 @@ export default function DraftsPage() {
   }
 
   useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (!u) router.replace("/");
-      if (u) void load(u);
-    });
-  }, []);
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/");
+      return;
+    }
+    void load(user);
+  }, [user, authLoading, router]);
 
   async function deleteDraft(id: string) {
     if (!user) return;
@@ -257,6 +258,14 @@ export default function DraftsPage() {
         <p className="mt-4 text-zinc-600 dark:text-zinc-400">
           Configure Firebase first (see docs/FIREBASE_SETUP.md).
         </p>
+      </main>
+    );
+  }
+  if (authLoading) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-6 py-16">
+        <h1 className="text-2xl font-semibold">Drafts</h1>
+        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
       </main>
     );
   }

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { auth, isFirebaseConfigured } from "@/lib/firebase";
+import { isFirebaseConfigured } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 import type { CorpusItem, VoiceProfile } from "@/lib/corpus/types";
 
 export default function CorpusPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [items, setItems] = useState<CorpusItem[]>([]);
@@ -41,13 +42,13 @@ export default function CorpusPage() {
   }
 
   useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (!u) router.replace("/");
-      if (u) void loadCorpus(u);
-    });
-  }, []);
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/");
+      return;
+    }
+    void loadCorpus(user);
+  }, [user, authLoading, router]);
 
   function addArticleField() {
     setCustomArticles((prev) => [...prev, { title: "", content: "" }]);
@@ -134,6 +135,14 @@ export default function CorpusPage() {
     );
   }
 
+  if (authLoading) {
+    return (
+      <main className="mx-auto w-full max-w-4xl px-6 py-16">
+        <h1 className="text-2xl font-semibold">Authorial Voice Corpus</h1>
+        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
+      </main>
+    );
+  }
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-4xl px-6 py-16">

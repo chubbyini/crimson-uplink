@@ -1,25 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   GoogleAuthProvider,
-  onAuthStateChanged,
   signInWithPopup,
   signOut,
-  type User,
 } from "firebase/auth";
 import { auth, isFirebaseConfigured } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function AuthButton() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, setUser);
-  }, []);
 
   if (!isFirebaseConfigured || !auth) {
     return (

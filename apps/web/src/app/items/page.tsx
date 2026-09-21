@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   collection,
@@ -12,7 +12,8 @@ import {
   startAfter,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
+import { db, isFirebaseConfigured } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 
 interface ItemRow {
   id: string;
@@ -29,7 +30,7 @@ interface ItemRow {
 const sources = ["all", "hn", "rss", "youtube", "bluesky", "mastodon", "github", "npm", "devto"];
 
 export default function ItemsPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [rows, setRows] = useState<ItemRow[]>([]);
   const [filter, setFilter] = useState("all");
@@ -62,18 +63,17 @@ export default function ItemsPage() {
   }
 
   useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (!u) router.replace("/");
-      if (u && db) {
-        setRows([]);
-        setCursor(null);
-        setHasMore(true);
-        await loadPage(u, true);
-      }
-    });
-  }, []);
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/");
+      return;
+    }
+    if (!db) return;
+    setRows([]);
+    setCursor(null);
+    setHasMore(true);
+    void loadPage(user, true);
+  }, [user, authLoading, router]);
 
   if (!isFirebaseConfigured) {
     return (
@@ -82,6 +82,14 @@ export default function ItemsPage() {
         <p className="mt-4 text-zinc-600 dark:text-zinc-400">
           Configure Firebase first (see docs/FIREBASE_SETUP.md).
         </p>
+      </main>
+    );
+  }
+  if (authLoading) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-6 py-16">
+        <h1 className="text-2xl font-semibold">Sources</h1>
+        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
       </main>
     );
   }
