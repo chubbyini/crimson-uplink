@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { assertDocId } from "@/lib/validation";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -35,10 +36,15 @@ export async function POST(req: Request) {
   }
 
   const { draftId } = (await req.json()) as { draftId?: string };
-  if (!draftId) return NextResponse.json({ error: "Missing draftId" }, { status: 400 });
+  let safeId: string;
+  try {
+    safeId = assertDocId(draftId ?? "", "draftId");
+  } catch {
+    return NextResponse.json({ error: "Invalid draftId" }, { status: 400 });
+  }
 
   const db = adminDb();
-  await db.doc(`users/${uid}/drafts/${draftId}`).delete();
+  await db.doc(`users/${uid}/drafts/${safeId}`).delete();
 
-  return NextResponse.json({ success: true, draftId });
+  return NextResponse.json({ success: true, draftId: safeId });
 }

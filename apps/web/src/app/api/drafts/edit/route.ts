@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { editDraftWithGroq } from "@/lib/draft/generate";
 import { loadSettings } from "@/lib/pipeline";
+import { assertDocId } from "@/lib/validation";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -46,15 +47,23 @@ export async function POST(req: Request) {
     prompt?: string;
   };
 
-  if (!prompt?.trim()) {
+  if (!prompt?.trim() || prompt.length > 4000) {
     return NextResponse.json({ error: "Missing prompt instruction" }, { status: 400 });
+  }
+  let safeDraftId: string | null = null;
+  if (draftId) {
+    try {
+      safeDraftId = assertDocId(draftId, "draftId");
+    } catch {
+      return NextResponse.json({ error: "Invalid draftId" }, { status: 400 });
+    }
   }
 
   const db = adminDb();
-  let bodyToEdit = currentBody ?? "";
+  let bodyToEdit = (currentBody ?? "").slice(0, 60000);
 
-  if (draftId) {
-    const draftSnap = await db.doc(`users/${uid}/drafts/${draftId}`).get();
+  if (safeDraftId) {
+    const draftSnap = await db.doc(`users/${uid}/drafts/${safeDraftId}`).get();
     if (!draftSnap.exists) {
       return NextResponse.json({ error: "Draft not found" }, { status: 404 });
     }
@@ -78,12 +87,12 @@ export async function POST(req: Request) {
     );
   }
 
-  if (draftId) {
-    await db.doc(`users/${uid}/drafts/${draftId}`).update({
+  if (safeDraftId) {
+    await db.doc(`users/${uid}/drafts/${safeDraftId}`).update({
       body: edited.text,
       editedAt: new Date().toISOString(),
     });
   }
 
-  return NextResponse.json({ text: edited.text, model: edited.model, draftId });
+  return NextResponse.json({ text: edited.text, model: edited.model, draftId: safeDraftId });
 }

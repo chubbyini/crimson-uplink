@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { checkRateLimit } from "@/lib/rate-limit";
-import type { IdeaStatus } from "@/lib/ideas/schema";
+import { assertDocId, isIdeaStatus } from "@/lib/validation";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -37,15 +37,21 @@ export async function POST(req: Request) {
 
   const { ideaId, status } = (await req.json()) as {
     ideaId?: string;
-    status?: IdeaStatus;
+    status?: string;
   };
 
-  if (!ideaId || !status) {
-    return NextResponse.json({ error: "Missing ideaId or status" }, { status: 400 });
+  let safeId: string;
+  try {
+    safeId = assertDocId(ideaId ?? "", "ideaId");
+  } catch {
+    return NextResponse.json({ error: "Invalid ideaId" }, { status: 400 });
+  }
+  if (!isIdeaStatus(status)) {
+    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
   const db = adminDb();
-  await db.doc(`users/${uid}/ideas/${ideaId}`).update({ status });
+  await db.doc(`users/${uid}/ideas/${safeId}`).update({ status });
 
-  return NextResponse.json({ success: true, ideaId, status });
+  return NextResponse.json({ success: true, ideaId: safeId, status });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { refineForLinkedin } from "@/lib/draft/generate";
 import { loadSettings } from "@/lib/pipeline";
+import { assertDocId } from "@/lib/validation";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -41,10 +42,15 @@ export async function POST(req: Request) {
   }
 
   const { draftId } = (await req.json()) as { draftId?: string };
-  if (!draftId) return NextResponse.json({ error: "Missing draftId" }, { status: 400 });
+  let safeId: string;
+  try {
+    safeId = assertDocId(draftId ?? "", "draftId");
+  } catch {
+    return NextResponse.json({ error: "Invalid draftId" }, { status: 400 });
+  }
 
   const db = adminDb();
-  const draftSnap = await db.doc(`users/${uid}/drafts/${draftId}`).get();
+  const draftSnap = await db.doc(`users/${uid}/drafts/${safeId}`).get();
   if (!draftSnap.exists) {
     return NextResponse.json({ error: "Draft not found" }, { status: 404 });
   }
@@ -65,13 +71,13 @@ export async function POST(req: Request) {
   }
 
   const now = new Date().toISOString();
-  await db.doc(`users/${uid}/drafts/${draftId}`).update({
+  await db.doc(`users/${uid}/drafts/${safeId}`).update({
     linkedinBody: refined.text,
     linkedinRefinedAt: now,
   });
 
   return NextResponse.json({
-    draftId,
+    draftId: safeId,
     linkedinBody: refined.text,
     characterCount: refined.text.length,
     model: refined.model,

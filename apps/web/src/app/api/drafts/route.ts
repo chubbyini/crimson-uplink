@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { generateDraft } from "@/lib/draft/generate";
 import { loadSettings } from "@/lib/pipeline";
+import { assertDocId } from "@/lib/validation";
 
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -51,10 +52,15 @@ export async function POST(req: Request) {
   }
 
   const { ideaId } = (await req.json()) as { ideaId?: string };
-  if (!ideaId) return NextResponse.json({ error: "Missing ideaId" }, { status: 400 });
+  let safeIdeaId: string;
+  try {
+    safeIdeaId = assertDocId(ideaId ?? "", "ideaId");
+  } catch {
+    return NextResponse.json({ error: "Invalid ideaId" }, { status: 400 });
+  }
 
   const db = adminDb();
-  const ideaSnap = await db.doc(`users/${uid}/ideas/${ideaId}`).get();
+  const ideaSnap = await db.doc(`users/${uid}/ideas/${safeIdeaId}`).get();
   if (!ideaSnap.exists) {
     return NextResponse.json({ error: "Idea not found" }, { status: 404 });
   }
@@ -85,7 +91,7 @@ export async function POST(req: Request) {
   const ref = db.collection(`users/${uid}/drafts`).doc();
   const batch = db.batch();
   batch.set(ref, {
-    ideaId,
+    ideaId: safeIdeaId,
     title: idea.title,
     format: idea.format,
     body: draft.text,
@@ -93,8 +99,8 @@ export async function POST(req: Request) {
     status: "pending_review",
     createdAt: now,
   });
-  batch.update(db.doc(`users/${uid}/ideas/${ideaId}`), { status: "drafted" });
+  batch.update(db.doc(`users/${uid}/ideas/${safeIdeaId}`), { status: "drafted" });
   await batch.commit();
 
-  return NextResponse.json({ id: ref.id, ...draft, ideaId });
+  return NextResponse.json({ id: ref.id, ...draft, ideaId: safeIdeaId });
 }

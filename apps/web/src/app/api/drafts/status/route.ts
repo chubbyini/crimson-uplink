@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { assertDocId, isDraftStatus } from "@/lib/validation";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -36,14 +37,20 @@ export async function POST(req: Request) {
 
   const { draftId, status } = (await req.json()) as {
     draftId?: string;
-    status?: "pending_review" | "approved" | "rejected";
+    status?: string;
   };
-  if (!draftId || !status) {
-    return NextResponse.json({ error: "Missing draftId or status" }, { status: 400 });
+  let safeId: string;
+  try {
+    safeId = assertDocId(draftId ?? "", "draftId");
+  } catch {
+    return NextResponse.json({ error: "Invalid draftId" }, { status: 400 });
+  }
+  if (!isDraftStatus(status) || status === "published") {
+    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
   const db = adminDb();
-  const draftRef = db.doc(`users/${uid}/drafts/${draftId}`);
+  const draftRef = db.doc(`users/${uid}/drafts/${safeId}`);
 
   if (status === "rejected") {
     await draftRef.delete();

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { publishToDevto } from "@/lib/publish/devto";
 import { loadSettings } from "@/lib/pipeline";
+import { assertDocId } from "@/lib/validation";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -38,14 +39,32 @@ export async function POST(req: Request) {
     );
   }
 
-  const { draftId, published } = (await req.json()) as {
+  const { draftId, published, idempotencyKey } = (await req.json()) as {
     draftId?: string;
     published?: boolean;
+    idempotencyKey?: string;
   };
-  if (!draftId) return NextResponse.json({ error: "Missing draftId" }, { status: 400 });
+  let safeId: string;
+  try {
+    safeId = assertDocId(draftId ?? "", "draftId");
+  } catch {
+    return NextResponse.json({ error: "Invalid draftId" }, { status: 400 });
+  }
 
   const db = adminDb();
-  const draftSnap = await db.doc(`users/${uid}/drafts/${draftId}`).get();
+  // Dedupe: same draft + same key must not publish twice on retry/double-click.
+  if (idempotencyKey && /^[A-Za-z0-9_-]{1,64}$/.test(idempotencyKey)) {
+    const dupe = await db
+      .collection(`users/${uid}/publishes`)
+      .where("draftId", "==", safeId)
+      .where("idempotencyKey", "==", idempotencyKey)
+      .limit(1)
+      .get();
+    if (!dupe.empty) {
+      return NextResponse.json({ deduped: true, url: (dupe.docs[0].data() as { url?: string }).url ?? null });
+    }
+  }
+  const draftSnap = await db.doc(`users/${uid}/drafts/${safeId}`).get();
   if (!draftSnap.exists) {
     return NextResponse.json({ error: "Draft not found" }, { status: 404 });
   }
@@ -82,10 +101,11 @@ export async function POST(req: Request) {
     platform: "devto",
     url: result.url,
     devtoId: result.id,
-    draftId,
+    draftId: safeId,
+    idempotencyKey: typeof idempotencyKey === "string" ? idempotencyKey.slice(0, 64) : null,
     publishedAt: now,
   });
-  batch.update(db.doc(`users/${uid}/drafts/${draftId}`), { status: "published" });
+  batch.update(db.doc(`users/${uid}/drafts/${safeId}`), { status: "published" });
   await batch.commit();
 
   return NextResponse.json(result);
