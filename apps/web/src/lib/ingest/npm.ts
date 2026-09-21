@@ -2,8 +2,8 @@ import type { RawItem } from "./types";
 
 /**
  * Weekly download counts for the user's watchlist packages.
- * Stable package URLs dedupe after the first run — new packages you add
- * surface once as idea candidates.
+ * URL is bucketed by ISO week so trending packages re-surface weekly
+ * instead of deduping forever on the stable npm URL.
  */
 export async function fetchNpmPackages(pkgs: string[]): Promise<RawItem[]> {
   const names = pkgs.map((p) => p.trim()).filter(Boolean);
@@ -22,11 +22,17 @@ export async function fetchNpmPackages(pkgs: string[]): Promise<RawItem[]> {
       : Object.values(data);
   return entries
     .filter((e) => e.package && typeof e.downloads === "number")
-    .map((e) => ({
-      title: `${e.package} — ${(e.downloads as number).toLocaleString("en-US")} weekly downloads`,
-      url: `https://www.npmjs.com/package/${e.package}`,
-      source: "npm" as const,
-      sourceId: e.package,
-      points: e.downloads,
-    }));
+    .map((e) => {
+      const week = new Date().toISOString().slice(0, 7);
+      // Week-bucketed query param survives normalizeUrl (hash would be stripped),
+      // so trending packages re-surface each month instead of deduping forever.
+      const base = `https://www.npmjs.com/package/${e.package}?trending=${week}`;
+      return {
+        title: `${e.package} — ${(e.downloads as number).toLocaleString("en-US")} weekly downloads`,
+        url: base,
+        source: "npm" as const,
+        sourceId: `${e.package}@${week}`,
+        points: e.downloads,
+      };
+    });
 }

@@ -30,13 +30,15 @@ export async function fetchTrendingRepos(
   );
   if (!res.ok) throw new Error(`GitHub search failed: ${res.status}`);
   const data = (await res.json()) as { items?: GhRepo[] };
+  const week = new Date().toISOString().slice(0, 7);
   return (data.items ?? []).map((r) => ({
     title: r.description
       ? `${r.full_name}: ${r.description}`.slice(0, 200)
       : r.full_name,
-    url: r.html_url,
+    // Week bucket so the same hot repo can re-surface next week with fresh stars.
+    url: `${r.html_url}?trending=${week}`,
     source: "github" as const,
-    sourceId: r.full_name,
+    sourceId: `${r.full_name}@${week}`,
     publishedAt: r.created_at,
     points: r.stargazers_count,
   }));

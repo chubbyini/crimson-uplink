@@ -67,14 +67,32 @@ function defaultShouldRetry(error: unknown): boolean {
   if (
     msg.includes("429") ||
     msg.includes("rate limit") ||
+    msg.includes("rate_limit") ||
     msg.includes("too many requests") ||
+    msg.includes("overloaded") ||
+    msg.includes("service unavailable") ||
+    msg.includes("temporarily unavailable") ||
+    msg.includes("timeout") ||
     msg.includes("500") ||
     msg.includes("502") ||
     msg.includes("503") ||
     msg.includes("504") ||
     msg.includes("econnreset") ||
-    msg.includes("etimedout")
+    msg.includes("etimedout") ||
+    msg.includes("eai_again") ||
+    msg.includes("socket hang up")
   ) {
+    return true;
+  }
+
+  // SDK errors often carry status/code instead of message text.
+  const withStatus = error as { status?: unknown; statusCode?: unknown; code?: unknown };
+  const statusNums = [withStatus.status, withStatus.statusCode]
+    .map((s) => Number(s))
+    .filter((n) => Number.isFinite(n));
+  if (statusNums.some((n) => n === 429 || (n >= 500 && n <= 599))) return true;
+  const code = String(withStatus.code ?? "").toLowerCase();
+  if (code.includes("rate_limit") || code.includes("overloaded") || code.includes("timeout") || code.includes("unavailable")) {
     return true;
   }
 

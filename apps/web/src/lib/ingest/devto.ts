@@ -31,6 +31,7 @@ export async function fetchDevtoByTags(
           title: a.title,
           url: a.url,
           source: "devto",
+          sourceId: a.url,
           author: a.user?.username,
           publishedAt: a.published_at,
           points: a.public_reactions_count,
