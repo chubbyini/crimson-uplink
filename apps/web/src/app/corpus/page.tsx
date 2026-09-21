@@ -5,10 +5,13 @@ import { type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { PageSkeleton } from "@/components/Skeletons";
 import type { CorpusItem, VoiceProfile } from "@/lib/corpus/types";
 
 export default function CorpusPage() {
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
   const router = useRouter();
 
   const [items, setItems] = useState<CorpusItem[]>([]);
@@ -47,6 +50,8 @@ export default function CorpusPage() {
       router.replace("/");
       return;
     }
+    // Auth-gated initial fetch: runs once per sign-in, not per render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadCorpus(user);
   }, [user, authLoading, router]);
 
@@ -100,7 +105,9 @@ export default function CorpusPage() {
       setCustomArticles([{ title: "", content: "" }]);
       await loadCorpus(user);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ingestion failed");
+      const msg = e instanceof Error ? e.message : "Ingestion failed";
+      setError(msg);
+      toast.error(msg);
       setStatus("error");
     }
   }
@@ -119,9 +126,12 @@ export default function CorpusPage() {
       if (!res.ok) throw new Error(data.error ?? "Voice analysis failed");
 
       setVoiceProfile(data.voiceProfile);
+      toast.success(`Voice guide generated from ${data.voiceProfile?.sampleCount ?? "your"} samples ✓`);
       setStatus("idle");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Voice analysis failed");
+      const msg = e instanceof Error ? e.message : "Voice analysis failed";
+      setError(msg);
+      toast.error(msg);
       setStatus("error");
     }
   }
@@ -135,14 +145,7 @@ export default function CorpusPage() {
     );
   }
 
-  if (authLoading) {
-    return (
-      <main className="mx-auto w-full max-w-4xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">Authorial Voice Corpus</h1>
-        <p className="mt-4 text-sm text-slate-500">Loading…</p>
-      </main>
-    );
-  }
+  if (authLoading) return <PageSkeleton title="Authorial Voice Corpus" />;
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-4xl px-6 py-16">

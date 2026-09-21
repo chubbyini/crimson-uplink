@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { PageSkeleton } from "@/components/Skeletons";
 import { emptySettings, type Settings } from "@/lib/settings";
-import { getSettings, saveSettings } from "@/lib/settings-store";
 
 const toLines = (arr: string[]) => arr.join("\n");
 const fromLines = (text: string) =>
@@ -17,6 +18,7 @@ const fromLines = (text: string) =>
 
 export default function SettingsPage() {
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
   const router = useRouter();
   const [form, setForm] = useState<Settings>(emptySettings);
   const [lists, setLists] = useState({
@@ -44,6 +46,8 @@ export default function SettingsPage() {
       return;
     }
     const u = user;
+    // Auth-gated initial fetch: runs once per sign-in, not per render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatus("loading");
     (async () => {
       try {
@@ -85,14 +89,7 @@ export default function SettingsPage() {
     );
   }
 
-  if (authLoading) {
-    return (
-      <main className="mx-auto w-full max-w-2xl px-6 py-16">
-        <h1 className="ui-title">Settings</h1>
-        <p className="mt-4 text-sm text-slate-500">Loading…</p>
-      </main>
-    );
-  }
+  if (authLoading) return <PageSkeleton title="Settings" rows={2} />;
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-2xl px-6 py-16">
@@ -136,8 +133,11 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error(data.error ?? "Save failed");
 
       setStatus("saved");
+      toast.success("Settings saved ✓");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      const msg = e instanceof Error ? e.message : "Save failed";
+      setError(msg);
+      toast.error(msg);
       setStatus("error");
     }
   }
@@ -291,9 +291,9 @@ export default function SettingsPage() {
             {status === "saving" ? "Saving…" : "Save settings"}
           </button>
           {status === "saved" && (
-            <span className="text-sm text-green-600">Saved.</span>
+            <span className="text-sm text-emerald-400">Saved.</span>
           )}
-          {error && <span className="text-sm text-red-600">{error}</span>}
+          {error && <span className="text-sm text-red-400">{error}</span>}
         </div>
       </form>
       <section className="ui-panel mt-10 p-5">
@@ -327,8 +327,11 @@ export default function SettingsPage() {
               }
               if (!res.ok) throw new Error(data.error ?? `Ingest failed (HTTP ${res.status})`);
               setIngest(data as Parameters<typeof setIngest>[0]);
+              toast.success("Ingest complete ✓");
             } catch (e) {
-              setError(e instanceof Error ? e.message : "Ingest failed");
+              const msg = e instanceof Error ? e.message : "Ingest failed";
+              setError(msg);
+              toast.error(msg);
             } finally {
               setIngesting(false);
             }

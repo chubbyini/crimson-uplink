@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import AuthButton from "@/components/AuthButton";
 import { AuthProvider } from "@/components/AuthProvider";
+import { ToastProvider } from "@/components/Toast";
 import { MobileMenu, Sidebar } from "@/components/NavLinks";
 import CrimsonVeins from "@/components/CrimsonVeins";
 import BackgroundWarship from "@/components/BackgroundWarship";
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="min-h-full flex flex-col bg-[#07090e] text-slate-100 relative font-sans selection:bg-sky-500 selection:text-white bg-mta-grid">
         <AuthProvider>
+        <ToastProvider>
         {/* Background Vascular Vein & Lightning Overlay */}
         <CrimsonVeins />
 
@@ -91,6 +93,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </p>
           </div>
         </footer>
+        </ToastProvider>
         </AuthProvider>
       </body>
     </html>

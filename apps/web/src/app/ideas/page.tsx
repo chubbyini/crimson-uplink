@@ -16,6 +16,8 @@ import {
 } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { PageSkeleton } from "@/components/Skeletons";
 import type { IdeaStatus, StoredIdea } from "@/lib/ideas/schema";
 
 interface IdeaRow extends StoredIdea {
@@ -30,6 +32,7 @@ const PAGE_SIZE = 20;
 
 export default function IdeasPage() {
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
   const router = useRouter();
   const [rows, setRows] = useState<IdeaRow[]>([]);
   const [filter, setFilter] = useState<(typeof filters)[number]>("all");
@@ -82,6 +85,8 @@ export default function IdeasPage() {
       router.replace("/");
       return;
     }
+    // Auth-gated initial fetch: runs once per sign-in, not per render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(user, true);
   }, [user, authLoading, router]);
 
@@ -101,8 +106,11 @@ export default function IdeasPage() {
       if (!res.ok) throw new Error(data.error ?? "Failed to update status");
 
       setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: s } : r)));
+      toast.success(s === "approved" ? "Idea approved ✓" : "Idea skipped");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update status");
+      const msg = e instanceof Error ? e.message : "Failed to update status";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -120,9 +128,12 @@ export default function IdeasPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Scoring failed");
       setTg(data.telegram ?? null);
+      toast.success(`Scored ${data.ideas?.length ?? 0} ideas ✓`);
       await load(user, true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Scoring failed");
+      const msg = e instanceof Error ? e.message : "Scoring failed";
+      setError(msg);
+      toast.error(msg);
       setStatus("error");
     }
   }
@@ -137,14 +148,7 @@ export default function IdeasPage() {
       </main>
     );
   }
-  if (authLoading) {
-    return (
-      <main className="mx-auto w-full max-w-3xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">Idea bank</h1>
-        <p className="mt-4 text-sm text-slate-500">Loading…</p>
-      </main>
-    );
-  }
+  if (authLoading) return <PageSkeleton title="Idea bank" />;
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
@@ -254,8 +258,11 @@ export default function IdeasPage() {
                           r.id === idea.id ? { ...r, status: "drafted" } : r
                         )
                       );
+                      toast.success("Draft ready — see the drafts page ✓");
                     } catch (e) {
-                      setError(e instanceof Error ? e.message : "Draft failed");
+                      const msg = e instanceof Error ? e.message : "Draft failed";
+                      setError(msg);
+                      toast.error(msg);
                     } finally {
                       setDrafting(null);
                     }

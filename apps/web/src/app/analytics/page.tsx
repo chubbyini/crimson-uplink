@@ -16,6 +16,8 @@ import {
 } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { PageSkeleton } from "@/components/Skeletons";
 
 type Platform = "linkedin" | "devto" | "x" | "medium";
 
@@ -39,6 +41,7 @@ const platforms: Platform[] = ["linkedin", "devto", "x", "medium"];
 
 export default function AnalyticsPage() {
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
   const router = useRouter();
   const [rows, setRows] = useState<PublishRow[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "syncing" | "error">("idle");
@@ -81,20 +84,29 @@ export default function AnalyticsPage() {
       router.replace("/");
       return;
     }
+    // Auth-gated initial fetch: runs once per sign-in, not per render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(user);
   }, [user, authLoading, router]);
 
   async function logPublish(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !db || !form.title.trim()) return;
-    await addDoc(collection(db, "users", user.uid, "publishes"), {
-      title: form.title.trim(),
-      platform: form.platform,
-      url: form.url.trim() || null,
-      publishedAt: new Date().toISOString(),
-    });
-    setForm({ title: "", platform: "linkedin", url: "" });
-    await load(user);
+    try {
+      await addDoc(collection(db, "users", user.uid, "publishes"), {
+        title: form.title.trim(),
+        platform: form.platform,
+        url: form.url.trim() || null,
+        publishedAt: new Date().toISOString(),
+      });
+      setForm({ title: "", platform: "linkedin", url: "" });
+      await load(user);
+      toast.success("Publish logged ✓");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to log publish";
+      setError(msg);
+      toast.error(msg);
+    }
   }
 
   async function saveManual(id: string) {
@@ -109,23 +121,31 @@ export default function AnalyticsPage() {
     const likes = parseNum(e.likes);
     if ((e.views.trim() !== "" && views === null) || (e.likes.trim() !== "" && likes === null)) {
       setError("Views/likes must be numbers 0 or higher");
+      toast.error("Views/likes must be numbers 0 or higher");
       return;
     }
-    await updateDoc(doc(db, "users", user.uid, "publishes", id), {
-      manualViews: views,
-      manualLikes: likes,
-    });
-    setRows((rs) =>
-      rs.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              manualViews: views ?? undefined,
-              manualLikes: likes ?? undefined,
-            }
-          : r
-      )
-    );
+    try {
+      await updateDoc(doc(db, "users", user.uid, "publishes", id), {
+        manualViews: views,
+        manualLikes: likes,
+      });
+      setRows((rs) =>
+        rs.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                manualViews: views ?? undefined,
+                manualLikes: likes ?? undefined,
+              }
+            : r
+        )
+      );
+      toast.success("Stats saved ✓");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save stats";
+      setError(msg);
+      toast.error(msg);
+    }
   }
 
   async function sync() {
@@ -142,9 +162,12 @@ export default function AnalyticsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Sync failed");
       setSyncInfo(`Checked ${data.checked} Dev.to posts, updated ${data.updated}.`);
+      toast.success(`Synced ${data.updated} Dev.to posts ✓`);
       await load(user);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sync failed");
+      const msg = e instanceof Error ? e.message : "Sync failed";
+      setError(msg);
+      toast.error(msg);
       setStatus("error");
     } finally {
       setStatus((s) => (s === "syncing" ? "idle" : s));
@@ -161,14 +184,7 @@ export default function AnalyticsPage() {
       </main>
     );
   }
-  if (authLoading) {
-    return (
-      <main className="mx-auto w-full max-w-3xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">Analytics</h1>
-        <p className="mt-4 text-sm text-slate-500">Loading…</p>
-      </main>
-    );
-  }
+  if (authLoading) return <PageSkeleton title="Analytics" />;
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">

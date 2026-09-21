@@ -4,9 +4,11 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, updateDoc } from "firebase/firestore";
+import { collection, doc, getDocs, limit, orderBy, query, updateDoc } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { PageSkeleton } from "@/components/Skeletons";
 
 interface DraftItem {
   id: string;
@@ -22,6 +24,7 @@ function LinkedInReadyContent() {
   const initialId = searchParams.get("id");
 
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
   const router = useRouter();
   const [drafts, setDrafts] = useState<DraftItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialId);
@@ -76,6 +79,8 @@ function LinkedInReadyContent() {
       router.replace("/");
       return;
     }
+    // Auth-gated initial fetch: runs once per sign-in, not per render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadDrafts(user);
   }, [initialId, user, authLoading, router]);
 
@@ -112,8 +117,11 @@ function LinkedInReadyContent() {
       setDrafts((prev) =>
         prev.map((d) => (d.id === id ? { ...d, linkedinBody: data.linkedinBody } : d))
       );
+      toast.success("LinkedIn post refined ✓");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Refine failed");
+      const msg = e instanceof Error ? e.message : "Refine failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setRefining(false);
     }
@@ -121,17 +129,39 @@ function LinkedInReadyContent() {
 
   async function copyToClipboard() {
     if (!editedLinkedin) return;
-    await navigator.clipboard.writeText(editedLinkedin);
+    try {
+      await navigator.clipboard.writeText(editedLinkedin);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = editedLinkedin;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+      } catch {
+        document.body.removeChild(ta);
+        toast.error("Copy failed — select the text manually");
+        return;
+      }
+      document.body.removeChild(ta);
+    }
     setCopied(true);
+    toast.success("Copied to clipboard ✓");
     setTimeout(() => setCopied(false), 2500);
   }
 
   async function saveEdits() {
     if (!user || !db || !currentDraft) return;
-    await updateDoc(doc(db, "users", user.uid, "drafts", currentDraft.id), {
-      linkedinBody: editedLinkedin,
-    });
-    setCurrentDraft((prev) => (prev ? { ...prev, linkedinBody: editedLinkedin } : null));
+    try {
+      await updateDoc(doc(db, "users", user.uid, "drafts", currentDraft.id), {
+        linkedinBody: editedLinkedin,
+      });
+      setCurrentDraft((prev) => (prev ? { ...prev, linkedinBody: editedLinkedin } : null));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save edits");
+    }
   }
 
   const charCount = editedLinkedin.length;
@@ -146,14 +176,7 @@ function LinkedInReadyContent() {
     );
   }
 
-  if (authLoading) {
-    return (
-      <main className="mx-auto w-full max-w-3xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">LinkedIn Ready</h1>
-        <p className="mt-4 text-sm text-slate-500">Loading…</p>
-      </main>
-    );
-  }
+  if (authLoading) return <PageSkeleton title="LinkedIn Ready" rows={2} />;
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">

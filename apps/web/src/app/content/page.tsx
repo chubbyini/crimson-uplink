@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { PageSkeleton } from "@/components/Skeletons";
 
 interface ContentResult {
   topics: string[];
@@ -25,6 +27,7 @@ interface ContentResult {
 
 export default function ContentPage() {
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
   const router = useRouter();
   const [topics, setTopics] = useState("");
   const [busy, setBusy] = useState(false);
@@ -59,8 +62,11 @@ export default function ContentPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Content run failed");
       setResult(data);
+      toast.success(`Researched ${data.ideas?.length ?? 0} ideas${data.draft ? " + drafted top idea" : ""} ✓`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Content run failed");
+      const msg = e instanceof Error ? e.message : "Content run failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -76,14 +82,7 @@ export default function ContentPage() {
       </main>
     );
   }
-  if (authLoading) {
-    return (
-      <main className="mx-auto w-full max-w-3xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">Content</h1>
-        <p className="mt-4 text-sm text-slate-500">Loading…</p>
-      </main>
-    );
-  }
+  if (authLoading) return <PageSkeleton title="Content" rows={2} />;
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">

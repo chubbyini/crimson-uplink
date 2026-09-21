@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { PageSkeleton } from "@/components/Skeletons";
 
 interface ItemRow {
   id: string;
@@ -69,6 +70,8 @@ export default function ItemsPage() {
       return;
     }
     if (!db) return;
+    // Auth-gated initial fetch: runs once per sign-in, not per render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRows([]);
     setCursor(null);
     setHasMore(true);
@@ -85,14 +88,7 @@ export default function ItemsPage() {
       </main>
     );
   }
-  if (authLoading) {
-    return (
-      <main className="mx-auto w-full max-w-3xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">Sources</h1>
-        <p className="mt-4 text-sm text-slate-500">Loading…</p>
-      </main>
-    );
-  }
+  if (authLoading) return <PageSkeleton title="Sources" />;
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">

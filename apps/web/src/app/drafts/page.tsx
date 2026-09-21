@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import {
@@ -15,6 +14,8 @@ import {
 } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { PageSkeleton } from "@/components/Skeletons";
 
 interface DraftRow {
   id: string;
@@ -29,6 +30,7 @@ interface DraftRow {
 
 export default function DraftsPage() {
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
   const router = useRouter();
   const [rows, setRows] = useState<DraftRow[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -64,7 +66,9 @@ export default function DraftsPage() {
       // Open new tab to LinkedIn Ready page
       window.open(`/drafts/linkedin-ready?id=${id}`, "_blank");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "LinkedIn refine failed");
+      const msg = e instanceof Error ? e.message : "LinkedIn refine failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setRefiningLinkedin((prev) => ({ ...prev, [id]: false }));
     }
@@ -103,10 +107,12 @@ export default function DraftsPage() {
       router.replace("/");
       return;
     }
+    // Auth-gated initial fetch: runs once per sign-in, not per render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(user);
   }, [user, authLoading, router]);
 
-  async function deleteDraft(id: string) {
+  async function deleteDraft(id: string, silent = false) {
     if (!user) return;
     try {
       const token = await user.getIdToken();
@@ -123,8 +129,11 @@ export default function DraftsPage() {
 
       setRows((rs) => rs.filter((r) => r.id !== id));
       if (editing === id) setEditing(null);
+      if (!silent) toast.success("Draft deleted");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete draft");
+      const msg = e instanceof Error ? e.message : "Failed to delete draft";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -148,8 +157,11 @@ export default function DraftsPage() {
       if (!res.ok) throw new Error(data.error ?? "Failed to update status");
 
       setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: s } : r)));
+      toast.success(s === "approved" ? "Draft approved ✓" : "Draft status updated");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update status");
+      const msg = e instanceof Error ? e.message : "Failed to update status";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -169,21 +181,30 @@ export default function DraftsPage() {
         document.body.removeChild(ta);
       } catch {
         setError("Copy failed — select the text manually");
+        toast.error("Copy failed — select the text manually");
         return;
       }
     }
     setCopied(id);
+    toast.success("Copied to clipboard ✓");
     setTimeout(() => setCopied((c) => (c === id ? null : c)), 2000);
   }
 
   async function saveEdit(id: string) {
     if (!user || !db) return;
-    await updateDoc(doc(db, "users", user.uid, "drafts", id), {
-      body: editBody,
-      editedAt: new Date().toISOString(),
-    });
-    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, body: editBody } : r)));
-    setEditing(null);
+    try {
+      await updateDoc(doc(db, "users", user.uid, "drafts", id), {
+        body: editBody,
+        editedAt: new Date().toISOString(),
+      });
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, body: editBody } : r)));
+      setEditing(null);
+      toast.success("Edit saved");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to save edit";
+      setError(msg);
+      toast.error(msg);
+    }
   }
 
   async function aiRefineDraft(id: string, currentText: string) {
@@ -213,8 +234,11 @@ export default function DraftsPage() {
       setEditBody(data.text);
       setRows((rs) => rs.map((r) => (r.id === id ? { ...r, body: data.text } : r)));
       setAiPrompts((prev) => ({ ...prev, [id]: "" }));
+      toast.success("Draft refined with Groq ✓");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "AI edit failed");
+      const msg = e instanceof Error ? e.message : "AI edit failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setAiLoading((prev) => ({ ...prev, [id]: false }));
     }
@@ -237,11 +261,14 @@ export default function DraftsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Publish failed");
       setPubUrls((m) => ({ ...m, [id]: data.url }));
+      toast.success(data.deduped ? "Already published — opened existing post" : "Published ✓");
 
       // If content in draft has been pushed, delete it
-      await deleteDraft(id);
+      await deleteDraft(id, true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Publish failed");
+      const msg = e instanceof Error ? e.message : "Publish failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setPublishing(null);
     }
@@ -261,14 +288,7 @@ export default function DraftsPage() {
       </main>
     );
   }
-  if (authLoading) {
-    return (
-      <main className="mx-auto w-full max-w-3xl px-6 py-16">
-        <h1 className="ui-title">Drafts</h1>
-        <p className="mt-4 text-sm text-slate-500">Loading…</p>
-      </main>
-    );
-  }
+  if (authLoading) return <PageSkeleton title="Drafts" />;
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
