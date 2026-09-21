@@ -109,9 +109,20 @@ export default function DraftsPage() {
   }, []);
 
   async function deleteDraft(id: string) {
-    if (!user || !db) return;
+    if (!user) return;
     try {
-      await deleteDoc(doc(db, "users", user.uid, "drafts", id));
+      const token = await user.getIdToken();
+      const res = await fetch("/api/drafts/delete", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ draftId: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to delete draft");
+
       setRows((rs) => rs.filter((r) => r.id !== id));
       if (editing === id) setEditing(null);
     } catch (e) {
@@ -120,14 +131,28 @@ export default function DraftsPage() {
   }
 
   async function setDraftStatus(id: string, s: DraftRow["status"]) {
-    if (!user || !db) return;
+    if (!user) return;
     if (s === "rejected") {
-      // If content in draft is rejected, delete it
       await deleteDraft(id);
       return;
     }
-    await updateDoc(doc(db, "users", user.uid, "drafts", id), { status: s });
-    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: s } : r)));
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/drafts/status", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ draftId: id, status: s }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to update status");
+
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: s } : r)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update status");
+    }
   }
 
   async function copy(id: string, body: string) {

@@ -45,8 +45,14 @@ export default function SettingsPage() {
       if (u) {
         setStatus("loading");
         try {
-          const existing = await getSettings(u.uid);
-          const s = existing ?? emptySettings;
+          const token = await u.getIdToken();
+          const res = await fetch("/api/settings", {
+            headers: { authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? "Failed to load settings");
+
+          const s = (data.settings as Settings) ?? emptySettings;
           setForm(s);
           setLists({
             rssFeeds: toLines(s.rssFeeds),
@@ -94,10 +100,12 @@ export default function SettingsPage() {
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
+    if (!user) return;
     setStatus("saving");
     setError(null);
     try {
-      await saveSettings(user!.uid, {
+      const token = await user.getIdToken();
+      const updatedSettings: Settings = {
         ...form,
         rssFeeds: fromLines(lists.rssFeeds),
         youtubeChannelIds: fromLines(lists.youtubeChannelIds),
@@ -105,7 +113,19 @@ export default function SettingsPage() {
         mastodonHandles: fromLines(lists.mastodonHandles),
         npmPackages: fromLines(lists.npmPackages),
         devtoTags: fromLines(lists.devtoTags),
+      };
+
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ settings: updatedSettings }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+
       setStatus("saved");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");

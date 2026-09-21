@@ -182,8 +182,12 @@ export async function scoreForUser(
   return { count: ideas.length, ids, telegram };
 }
 
+import { decryptSettingsSecrets } from "@/lib/crypto";
+
 export async function loadSettings(db: Firestore, uid: string): Promise<Settings | null> {
   const snap = await db.doc(`users/${uid}/settings/config`).get();
   if (!snap.exists) return null;
-  return SettingsSchema.parse(snap.data());
+  const rawData = snap.data() || {};
+  const decrypted = decryptSettingsSecrets(rawData);
+  return SettingsSchema.parse(decrypted);
 }

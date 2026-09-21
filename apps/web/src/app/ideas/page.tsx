@@ -73,9 +73,24 @@ export default function IdeasPage() {
   }, []);
 
   async function setIdeaStatus(id: string, s: IdeaStatus) {
-    if (!user || !db) return;
-    await updateDoc(doc(db, "users", user.uid, "ideas", id), { status: s });
-    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: s } : r)));
+    if (!user) return;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/ideas/status", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ ideaId: id, status: s }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to update status");
+
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: s } : r)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update status");
+    }
   }
 
   async function scoreNow() {

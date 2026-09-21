@@ -5,6 +5,8 @@ import { loadSettings, storeItems } from "@/lib/pipeline";
 import { scoreIdeas } from "@/lib/ideas/score";
 import { searchTopics } from "@/lib/search";
 
+import { checkRateLimit } from "@/lib/rate-limit";
+
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,6 +32,14 @@ export async function POST(req: Request) {
     const reason =
       e instanceof Error ? e.message.split("\n")[0] : "Invalid ID token";
     return NextResponse.json({ error: `Invalid ID token (${reason})` }, { status: 401 });
+  }
+
+  const rate = checkRateLimit(uid, 10, 60000);
+  if (!rate.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded (10 requests/min). Please try again shortly." },
+      { status: 429 }
+    );
   }
 
   const { topics, autoDraft } = (await req.json()) as {

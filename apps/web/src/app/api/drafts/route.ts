@@ -3,6 +3,8 @@ import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-
 import { generateDraft } from "@/lib/draft/generate";
 import { loadSettings } from "@/lib/pipeline";
 
+import { checkRateLimit } from "@/lib/rate-limit";
+
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,6 +29,14 @@ export async function POST(req: Request) {
     const reason =
       e instanceof Error ? e.message.split("\n")[0] : "Invalid ID token";
     return NextResponse.json({ error: `Invalid ID token (${reason})` }, { status: 401 });
+  }
+
+  const rate = checkRateLimit(uid, 15, 60000);
+  if (!rate.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Please try again shortly." },
+      { status: 429 }
+    );
   }
 
   const settings = await loadSettings(adminDb(), uid);
