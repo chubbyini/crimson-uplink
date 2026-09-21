@@ -87,3 +87,45 @@ export async function editDraftWithGroq(
   return { text: text.trim(), model: `groq/${model}` };
 }
 
+/**
+ * Groq = LinkedIn Specialist: transform a draft article into a 3000-character LinkedIn post.
+ */
+export async function refineForLinkedin(
+  apiKey: string,
+  title: string,
+  body: string
+): Promise<{ text: string; model: string }> {
+  const groq = createGroq({ apiKey });
+  const model = process.env.GROQ_MODEL ?? "openai/gpt-oss-120b";
+  const style = await styleGuide();
+
+  const { text } = await generateText({
+    model: groq(model),
+    system: `You are a top-tier LinkedIn tech influencer and developer ghostwriter. Voice guide:\n${style}`,
+    prompt: [
+      `Transform the following technical article into a high-performing, ready-to-post LinkedIn update.`,
+      ``,
+      `STRICT LINKEDIN CONSTRAINTS & FORMATTING:`,
+      `1. CHARACTER LIMIT: The total text MUST be STRICTLY UNDER 3000 CHARACTERS (target range: 1800–2700 characters). Never exceed 3000 characters.`,
+      `2. HOOK: Start with a powerful, single-line attention-grabbing hook in sentence 1. Do NOT start with "# Title".`,
+      `3. SPACING: Use short 1-2 sentence paragraphs with clear double line breaks for mobile readability.`,
+      `4. BULLETS: Use clean bullet points (• or ⚡) for key takeaways or insights.`,
+      `5. HASHTAGS: Include 3-5 relevant developer hashtags at the end (e.g. #SoftwareEngineering #WebDev #NextJS).`,
+      `6. CALL TO ACTION: End with a thought-provoking question to invite comments.`,
+      ``,
+      `Working Title: ${title}`,
+      `Original Article Body:\n${body}`,
+      ``,
+      `Return ONLY the complete, ready-to-paste LinkedIn post content.`,
+    ].join("\n"),
+    maxOutputTokens: 2500,
+  });
+
+  let cleaned = text.trim();
+  if (cleaned.length > 2990) {
+    cleaned = cleaned.slice(0, 2985) + "\n\n#Tech #SoftwareEngineering";
+  }
+  return { text: cleaned, model: `groq/${model}` };
+}
+
+

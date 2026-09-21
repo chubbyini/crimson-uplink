@@ -42,6 +42,33 @@ export default function DraftsPage() {
   const [editBody, setEditBody] = useState("");
   const [aiPrompts, setAiPrompts] = useState<Record<string, string>>({});
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+  const [refiningLinkedin, setRefiningLinkedin] = useState<Record<string, boolean>>({});
+
+  async function openRefineLinkedin(id: string) {
+    if (!user) return;
+    setRefiningLinkedin((prev) => ({ ...prev, [id]: true }));
+    setError(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/drafts/refine-linkedin", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ draftId: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "LinkedIn refine failed");
+
+      // Open new tab to LinkedIn Ready page
+      window.open(`/drafts/linkedin-ready?id=${id}`, "_blank");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "LinkedIn refine failed");
+    } finally {
+      setRefiningLinkedin((prev) => ({ ...prev, [id]: false }));
+    }
+  }
 
   async function load(u: User) {
     if (!db) return;
@@ -301,6 +328,13 @@ export default function DraftsPage() {
               </div>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => openRefineLinkedin(d.id)}
+                disabled={refiningLinkedin[d.id]}
+                className="rounded-full border border-sky-500/50 bg-sky-500/10 px-4 py-1.5 text-xs font-semibold text-sky-400 hover:bg-sky-500/20 disabled:opacity-50"
+              >
+                {refiningLinkedin[d.id] ? "Refining for LinkedIn…" : "Refine for LinkedIn 🚀"}
+              </button>
               <button
                 onClick={() => copy(d.id, d.body)}
                 className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"

@@ -21,6 +21,7 @@ const links = [
   { href: "/ideas", label: "IDEAS" },
   { href: "/content", label: "CONTENT" },
   { href: "/drafts", label: "DRAFTS" },
+  { href: "/drafts/linkedin-ready", label: "LINKEDIN READY" },
   { href: "/analytics", label: "ANALYTICS" },
   { href: "/settings", label: "SETTINGS" },
 ];
