@@ -63,6 +63,11 @@ export async function POST(req: Request) {
   }
 
   const db = adminDb();
+  const { checkDailyLlmCap, recordLlmUsage } = await import("@/lib/usage");
+  const cap = await checkDailyLlmCap(db, uid, 2);
+  if (!cap.allowed) {
+    return NextResponse.json({ error: `Daily AI limit reached (${cap.used}/${cap.cap}). Try again tomorrow.` }, { status: 429 });
+  }
   const raw = await searchTopics({ topics: clean, githubToken: settings.githubToken || undefined });
   const stored = await storeItems(db, uid, raw, { topicSearch: clean });
   const now = new Date().toISOString();
@@ -97,10 +102,12 @@ export async function POST(req: Request) {
   }
 
   const ideaBatch = db.batch();
+  const cleanIdea = (o: Record<string, unknown>) =>
+    Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
   const ideaIds = ideas.map((idea) => {
     const ref = db.collection(`users/${uid}/ideas`).doc();
     ideaBatch.set(ref, {
-      ...idea,
+      ...cleanIdea(idea as unknown as Record<string, unknown>),
       status: "new",
       createdAt: now,
       topicSearch: clean,
@@ -145,6 +152,7 @@ export async function POST(req: Request) {
     }
   }
 
+  await recordLlmUsage(db, uid, draft ? 2 : 1);
   return NextResponse.json({
     topics: clean,
     fetched: raw.length,

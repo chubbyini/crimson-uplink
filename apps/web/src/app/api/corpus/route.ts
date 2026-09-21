@@ -88,13 +88,14 @@ export async function POST(req: Request) {
   }
 
   if (articles && Array.isArray(articles)) {
-    for (const a of articles) {
-      if (a.content && a.content.trim().length > 20) {
+    for (const a of articles.slice(0, 20)) {
+      const content = typeof a.content === "string" ? a.content.trim().slice(0, 60000) : "";
+      if (content.length > 20) {
         toStore.push({
-          title: a.title?.trim() || `Writing Sample (${new Date().toLocaleDateString()})`,
+          title: (a.title?.trim() || `Writing Sample (${new Date().toLocaleDateString()})`).slice(0, 300),
           source: "custom",
-          body: a.content.trim(),
-          wordCount: a.content.trim().split(/\s+/).length,
+          body: content,
+          wordCount: content.split(/\s+/).length,
           createdAt: now,
         });
       }

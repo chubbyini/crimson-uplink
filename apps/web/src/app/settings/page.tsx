@@ -142,7 +142,7 @@ export default function SettingsPage() {
       <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
         Bring your own keys — stored under{" "}
         <code className="font-mono">users/{user.uid}/settings</code>, visible
-        only to you. MVP stores them as-is (see PRODUCT.md tradeoffs).
+        only to you. Keys are AES-256-GCM encrypted at rest and never returned in plain text.
       </p>
       <form onSubmit={onSave} className="mt-8 flex flex-col gap-5">
         <label className="block text-sm font-medium">

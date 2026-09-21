@@ -51,11 +51,14 @@ Agreed 2026-09-20. Each shortcut ships in MVP and gets hardened right after.
 - **Switch later:** per-user BotFather tokens in Settings (`TELEGRAM_BOT_TOKEN`
   per user).
 
-### 2. Per-user API keys stored plaintext in Firestore
+### 2. Per-user API keys AES-256-GCM encrypted in Firestore
 - **Decision:** `users/{uid}/settings` holds `GEMINI_KEY`, `GROQ_KEY`,
-  `DEVTO_KEY`, `LINKEDIN_TOKEN` as-is, Firestore rules locked to owner
-  (`request.auth.uid == uid`) so the cron job can read them.
-- **Accepted risk:** anyone with DB admin access can read keys.
+  `DEVTO_KEY`, `LINKEDIN_TOKEN` encrypted (`enc:` + random IV per write,
+  see `apps/web/src/lib/crypto.ts`), Firestore rules locked to owner
+  (`request.auth.uid == uid`), API responses masked, fail-closed
+  `ENCRYPTION_KEY`.
+- **Accepted risk:** single server-wide master key (KMS envelope later),
+  anyone with DB admin access + master key can read keys.
 - **Switch later:** KMS/Secret Manager envelope encryption + per-user
   LinkedIn OAuth app (refresh flow, no pasted tokens).
 

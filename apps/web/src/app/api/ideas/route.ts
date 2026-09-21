@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { loadSettings, scoreForUser } from "@/lib/pipeline";
+import { checkDailyLlmCap, recordLlmUsage } from "@/lib/usage";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -39,8 +40,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Save Settings first" }, { status: 400 });
   }
 
+  const db = adminDb();
+  const cap = await checkDailyLlmCap(db, uid);
+  if (!cap.allowed) {
+    return NextResponse.json({ error: `Daily AI limit reached (${cap.used}/${cap.cap}). Try again tomorrow.` }, { status: 429 });
+  }
+
   try {
-    return NextResponse.json(await scoreForUser(adminDb(), uid, settings));
+    const topics = [...(settings.devtoTags ?? []), ...(settings.npmPackages ?? [])].slice(0, 8);
+    const result = await scoreForUser(db, uid, settings, topics);
+    await recordLlmUsage(db, uid);
+    return NextResponse.json(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Scoring failed";
     const status = message.startsWith("Gemini failed") ? 502 : 400;

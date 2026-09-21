@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-// users/{uid}/settings — BYOK. Keys stored as-is (plaintext) for MVP speed;
-// see PRODUCT.md "MVP Tradeoffs" for the post-MVP encryption switch.
+// users/{uid}/settings — BYOK. Keys AES-256-GCM encrypted at rest (see lib/crypto.ts);
+// API responses are masked, saves merge so masked values never overwrite real keys.
 export const SettingsSchema = z.object({
   geminiKey: z.string().default(""),
   groqKey: z.string().default(""),
