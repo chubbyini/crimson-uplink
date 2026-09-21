@@ -1,0 +1,13 @@
+{
+  "name": "crimson-uplink-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Background ingest and scoring worker for Crimson Uplink (runs on GitHub Actions or local)",
+  "scripts": {
+    "ingest": "node ingest.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.1.0",
+    "rss-parser": "^3.13.0"
+  }
+}

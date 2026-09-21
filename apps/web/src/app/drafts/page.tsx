@@ -6,6 +6,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   collection,
+  deleteDoc,
   doc,
   getDocs,
   limit,
@@ -35,6 +36,13 @@ export default function DraftsPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
+  const [publishing, setPublishing] = useState<string | null>(null);
+  const [pubUrls, setPubUrls] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState("");
+  const [aiPrompts, setAiPrompts] = useState<Record<string, string>>({});
+  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+
   async function load(u: User) {
     if (!db) return;
     setStatus("loading");
@@ -46,7 +54,17 @@ export default function DraftsPage() {
           limit(30)
         )
       );
-      setRows(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<DraftRow, "id">) })));
+      const activeDocs: DraftRow[] = [];
+      for (const d of snap.docs) {
+        const data = d.data() as Omit<DraftRow, "id">;
+        // Clean up legacy published or rejected items
+        if (data.status === "published" || data.status === "rejected") {
+          void deleteDoc(doc(db, "users", u.uid, "drafts", d.id));
+        } else {
+          activeDocs.push({ id: d.id, ...data });
+        }
+      }
+      setRows(activeDocs);
       setStatus("idle");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load drafts");
@@ -63,8 +81,24 @@ export default function DraftsPage() {
     });
   }, []);
 
+  async function deleteDraft(id: string) {
+    if (!user || !db) return;
+    try {
+      await deleteDoc(doc(db, "users", user.uid, "drafts", id));
+      setRows((rs) => rs.filter((r) => r.id !== id));
+      if (editing === id) setEditing(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete draft");
+    }
+  }
+
   async function setDraftStatus(id: string, s: DraftRow["status"]) {
     if (!user || !db) return;
+    if (s === "rejected") {
+      // If content in draft is rejected, delete it
+      await deleteDraft(id);
+      return;
+    }
     await updateDoc(doc(db, "users", user.uid, "drafts", id), { status: s });
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: s } : r)));
   }
@@ -75,11 +109,6 @@ export default function DraftsPage() {
     setTimeout(() => setCopied((c) => (c === id ? null : c)), 2000);
   }
 
-  const [publishing, setPublishing] = useState<string | null>(null);
-  const [pubUrls, setPubUrls] = useState<Record<string, string>>({});
-  const [editing, setEditing] = useState<string | null>(null);
-  const [editBody, setEditBody] = useState("");
-
   async function saveEdit(id: string) {
     if (!user || !db) return;
     await updateDoc(doc(db, "users", user.uid, "drafts", id), {
@@ -88,6 +117,40 @@ export default function DraftsPage() {
     });
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, body: editBody } : r)));
     setEditing(null);
+  }
+
+  async function aiRefineDraft(id: string, currentText: string) {
+    if (!user) return;
+    const prompt = aiPrompts[id]?.trim();
+    if (!prompt) return;
+
+    setAiLoading((prev) => ({ ...prev, [id]: true }));
+    setError(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/drafts/edit", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          draftId: id,
+          currentBody: currentText,
+          prompt,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "AI edit failed");
+
+      setEditBody(data.text);
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, body: data.text } : r)));
+      setAiPrompts((prev) => ({ ...prev, [id]: "" }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AI edit failed");
+    } finally {
+      setAiLoading((prev) => ({ ...prev, [id]: false }));
+    }
   }
 
   async function publishTo(url: string, id: string, body?: object) {
@@ -107,7 +170,9 @@ export default function DraftsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Publish failed");
       setPubUrls((m) => ({ ...m, [id]: data.url }));
-      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: "published" } : r)));
+
+      // If content in draft has been pushed, delete it
+      await deleteDraft(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Publish failed");
     } finally {
@@ -144,12 +209,7 @@ export default function DraftsPage() {
     <main className="mx-auto w-full max-w-3xl px-6 py-12">
       <h1 className="text-2xl font-semibold">Drafts</h1>
       <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-        Draft from an approved idea on the{" "}
-        <Link href="/ideas" className="underline">
-          idea bank
-        </Link>{" "}
-        (Approve → draft in a later step; API: POST /api/drafts with ideaId).
-        Copy-paste to LinkedIn for now — API publish lands next.
+        Review article-level drafts generated by Groq. When pushed or rejected, drafts are automatically cleaned up.
       </p>
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       <ul className="mt-6 flex flex-col gap-4">
@@ -172,7 +232,7 @@ export default function DraftsPage() {
               onClick={() => setOpen((o) => (o === d.id ? null : d.id))}
               className="mt-1 text-xs text-zinc-500 underline"
             >
-              {open === d.id ? "Hide" : "Preview"}
+              {open === d.id ? "Hide Preview" : "Preview Article"}
             </button>
             {open === d.id && editing !== d.id && (
               <pre className="mt-2 max-h-96 overflow-auto rounded-xl bg-black/5 p-3 text-sm whitespace-pre-wrap text-slate-800 dark:bg-white/5 dark:text-slate-100">
@@ -180,19 +240,56 @@ export default function DraftsPage() {
               </pre>
             )}
             {editing === d.id && (
-              <div className="mt-2">
-                <textarea
-                  rows={12}
-                  value={editBody}
-                  onChange={(e) => setEditBody(e.target.value)}
-                  className="w-full rounded-xl border border-black/10 bg-white p-3 text-sm text-black dark:border-white/15 dark:bg-zinc-950 dark:text-zinc-100"
-                />
-                <div className="mt-2 flex gap-2">
+              <div className="mt-3 flex flex-col gap-3 rounded-xl border border-red-500/20 bg-black/5 p-4 dark:bg-white/5">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    Article Text Editor
+                  </label>
+                  <textarea
+                    rows={14}
+                    value={editBody}
+                    onChange={(e) => setEditBody(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-black/10 bg-white p-3 text-sm text-black dark:border-white/15 dark:bg-zinc-950 dark:text-zinc-100"
+                  />
+                </div>
+
+                {/* Groq AI Modification Box */}
+                <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+                  <span className="text-xs font-semibold text-red-600 dark:text-red-400">
+                    ✨ Edit with Groq AI
+                  </span>
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. Add a section with practical code examples, or change tone to beginner-friendly..."
+                      value={aiPrompts[d.id] ?? ""}
+                      onChange={(e) =>
+                        setAiPrompts((prev) => ({ ...prev, [d.id]: e.target.value }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void aiRefineDraft(d.id, editBody);
+                        }
+                      }}
+                      className="flex-1 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs dark:border-white/15 dark:bg-zinc-900 dark:text-zinc-100"
+                    />
+                    <button
+                      onClick={() => aiRefineDraft(d.id, editBody)}
+                      disabled={aiLoading[d.id] || !aiPrompts[d.id]?.trim()}
+                      className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800 disabled:opacity-50"
+                    >
+                      {aiLoading[d.id] ? "Refining…" : "Apply AI Edit"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
                   <button
                     onClick={() => saveEdit(d.id)}
                     className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-800"
                   >
-                    Save
+                    Save Changes
                   </button>
                   <button
                     onClick={() => setEditing(null)}
@@ -219,7 +316,7 @@ export default function DraftsPage() {
                   }}
                   className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
                 >
-                  Edit
+                  Edit / AI Refine
                 </button>
               )}
               {d.status === "pending_review" && (
@@ -234,7 +331,7 @@ export default function DraftsPage() {
                     onClick={() => setDraftStatus(d.id, "rejected")}
                     className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
                   >
-                    Reject
+                    Reject & Delete
                   </button>
                 </>
               )}
@@ -258,6 +355,12 @@ export default function DraftsPage() {
                   )}
                 </>
               )}
+              <button
+                onClick={() => deleteDraft(d.id)}
+                className="rounded-full border border-red-500/30 px-4 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400"
+              >
+                Delete
+              </button>
               {pubUrls[d.id] && (
                 <a
                   href={pubUrls[d.id]}
@@ -274,7 +377,7 @@ export default function DraftsPage() {
       </ul>
       {status === "idle" && !rows.length && (
         <p className="mt-6 text-sm text-zinc-500">
-          No drafts yet. Approve an idea, then draft it via POST /api/drafts.
+          No active drafts. Approve an idea from the idea bank to create new article drafts.
         </p>
       )}
     </main>

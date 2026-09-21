@@ -11,10 +11,35 @@ export interface ScorableItem {
 }
 
 /**
- * Gemini = brains: turn a pile of fresh items into 5 scored ideas.
+ * Synthesize rich article ideas directly from topics when external web items are scarce.
+ */
+export async function generateIdeasFromTopics(apiKey: string, topics: string[]) {
+  const google = createGoogleGenerativeAI({ apiKey });
+  const { object } = await generateObject({
+    model: google("gemini-3.5-flash-lite"),
+    schema: IdeasSchema,
+    system:
+      "You are a master technical content strategist for software engineers. " +
+      "The user provided specific topic(s). Synthesize 5 rich, in-depth, publication-worthy article ideas directly from deep domain knowledge of these topics. " +
+      "Each idea must have a catchy title, a concrete opinionated angle (never a generic summary), an appropriate format ('devto' for deep technical articles, 'linkedin' for industry takes, 'x' for newsy updates), a high score (8-10), and relevant reference documentation topic URLs.",
+    prompt: `Target Topics:\n${topics.map((t) => `- ${t}`).join("\n")}`,
+  });
+  return object.ideas;
+}
+
+/**
+ * Gemini = brains: turn a pile of fresh items (or topic list) into scored article ideas.
  * Caller passes the USER's key (BYOK) — never a shared server key.
  */
-export async function scoreIdeas(apiKey: string, items: ScorableItem[]) {
+export async function scoreIdeas(
+  apiKey: string,
+  items: ScorableItem[],
+  topics?: string[]
+) {
+  if (items.length < 3 && topics && topics.length > 0) {
+    return generateIdeasFromTopics(apiKey, topics);
+  }
+
   const google = createGoogleGenerativeAI({ apiKey });
   const lines = items.map(
     (i, n) =>
@@ -32,5 +57,12 @@ export async function scoreIdeas(apiKey: string, items: ScorableItem[]) {
       "Suggested format: linkedin for opinionated takes, x for newsy/one-chart items, devto for deep technical topics.",
     prompt: `Fresh items:\n${lines.join("\n")}`,
   });
+
+  if ((!object.ideas || object.ideas.length < 3) && topics && topics.length > 0) {
+    const topicIdeas = await generateIdeasFromTopics(apiKey, topics);
+    return [...(object.ideas || []), ...topicIdeas].slice(0, 10);
+  }
+
   return object.ideas;
 }
+

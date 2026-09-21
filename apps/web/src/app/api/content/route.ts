@@ -71,7 +71,8 @@ export async function POST(req: Request) {
         source: i.source,
         points: i.points,
         commentCount: i.commentCount,
-      }))
+      })),
+      clean
     );
   } catch (e) {
     return NextResponse.json(
