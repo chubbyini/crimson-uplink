@@ -1,6 +1,9 @@
 import { cert, getApp, getApps, initializeApp, type App } from "firebase-admin/app";
-import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+
+// NOTE: firebase-admin/auth is NEVER statically imported here. Its transitive
+// chain (jwks-rsa → ESM-only jose) crashes some server runtimes at load time.
+// It is loaded lazily inside adminAuth() with fallback to REST verification.
 
 function serviceAccount(): Record<string, unknown> | null {
   let raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -57,14 +60,24 @@ function getAdminApp(): App | null {
 
 export const isAdminConfigured = serviceAccount() !== null;
 
-let authInstance: Auth | null = null;
+type AuthLike = { verifyIdToken(token: string): Promise<{ uid: string }> };
 
-export function adminAuth(): Auth {
-  if (authInstance) return authInstance;
+async function loadAuth(app: App): Promise<AuthLike | null> {
+  try {
+    const mod = (await import("firebase-admin/auth")) as unknown as {
+      getAuth(a: App): AuthLike;
+    };
+    return mod.getAuth(app);
+  } catch (err) {
+    console.error("firebase-admin/auth unavailable, REST fallback active:", err);
+    return null;
+  }
+}
+
+export async function adminAuth(): Promise<AuthLike | null> {
   const a = getAdminApp();
-  if (!a) throw new Error("Firebase Admin not configured (FIREBASE_SERVICE_ACCOUNT_JSON)");
-  authInstance = getAuth(a);
-  return authInstance;
+  if (!a) return null;
+  return loadAuth(a);
 }
 
 export function adminDb(): Firestore {
@@ -83,15 +96,19 @@ export function adminDb(): Firestore {
 
 /**
  * Resilient ID token verification:
- * 1. Attempts adminAuth().verifyIdToken()
- * 2. If it fails due to Node ESM/CJS packaging issues, uses Google's Identity Toolkit REST API
+ * 1. Attempts admin verifyIdToken() (lazy-loaded, may be unavailable)
+ * 2. Falls back to Google's Identity Toolkit REST API (pure fetch)
  */
 export async function verifyFirebaseToken(token: string): Promise<string> {
   try {
-    const auth = adminAuth();
-    const decoded = await auth.verifyIdToken(token);
-    return decoded.uid;
+    const auth = await adminAuth();
+    if (auth) {
+      const decoded = await auth.verifyIdToken(token);
+      if (decoded?.uid) return decoded.uid;
+    }
   } catch (err) {
+    console.error("Admin token verification failed, trying REST:", err);
+  }
     // Fallback: Verify via Google Identity Toolkit REST API
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     if (apiKey) {
@@ -114,6 +131,5 @@ export async function verifyFirebaseToken(token: string): Promise<string> {
         console.error("REST token verification fallback failed:", fallbackErr);
       }
     }
-    throw err;
-  }
+    throw new Error("Invalid ID token");
 }

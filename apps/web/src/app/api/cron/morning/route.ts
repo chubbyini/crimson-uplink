@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminAuth, adminDb, isAdminConfigured } from "@/lib/firebase-admin";
+import { adminDb, isAdminConfigured } from "@/lib/firebase-admin";
 import { ingestForUser, loadSettings, scoreForUser } from "@/lib/pipeline";
 
 export const maxDuration = 60;
@@ -30,33 +30,31 @@ export async function GET(req: Request) {
 
   const db = adminDb();
   const results: Array<Record<string, unknown>> = [];
-  let pageToken: string | undefined;
 
-  // listUsers paginates (1000/page) — plenty for MVP scale.
-  do {
-    const page = await adminAuth().listUsers(1000, pageToken);
-    for (const u of page.users) {
-      const entry: Record<string, unknown> = { uid: u.uid };
-      try {
-        const settings = await loadSettings(db, u.uid);
-        if (!settings || !settings.ingestEnabled) {
-          entry.skipped = settings ? "ingest disabled" : "no settings";
-          results.push(entry);
-          continue;
-        }
-        entry.ingest = await ingestForUser(db, u.uid, settings);
-        try {
-          entry.ideas = await scoreForUser(db, u.uid, settings);
-        } catch (e) {
-          entry.ideasError = e instanceof Error ? e.message : "scoring failed";
-        }
-      } catch (e) {
-        entry.error = e instanceof Error ? e.message.split("\n")[0] : "failed";
+  // Users registry: users/{uid}/profile docs written on Settings save.
+  // (Avoids firebase-admin/auth listUsers, whose ESM chain breaks some runtimes.)
+  const profiles = await db.collection("users").get();
+  for (const doc of profiles.docs) {
+    const uid = doc.id;
+    const entry: Record<string, unknown> = { uid };
+    try {
+      const settings = await loadSettings(db, uid);
+      if (!settings || !settings.ingestEnabled) {
+        entry.skipped = settings ? "ingest disabled" : "no settings";
+        results.push(entry);
+        continue;
       }
-      results.push(entry);
+      entry.ingest = await ingestForUser(db, uid, settings);
+      try {
+        entry.ideas = await scoreForUser(db, uid, settings);
+      } catch (e) {
+        entry.ideasError = e instanceof Error ? e.message : "scoring failed";
+      }
+    } catch (e) {
+      entry.error = e instanceof Error ? e.message.split("\n")[0] : "failed";
     }
-    pageToken = page.pageToken;
-  } while (pageToken);
+    results.push(entry);
+  }
 
   return NextResponse.json({ users: results.length, results });
 }
