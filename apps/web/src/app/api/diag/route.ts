@@ -6,7 +6,9 @@ import { NextResponse } from "next/server";
  * Gated: requires DIAG_SECRET bearer when set, else same as CRON_SECRET.
  */
 export async function GET(req: Request) {
-  const secret = process.env.DIAG_SECRET ?? process.env.CRON_SECRET;
+  const secret = process.env.DIAG_SECRET?.trim()
+    ? process.env.DIAG_SECRET.trim()
+    : process.env.CRON_SECRET;
   if (secret) {
     const auth = req.headers.get("authorization");
     if (auth !== `Bearer ${secret}`) {
