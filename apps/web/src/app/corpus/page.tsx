@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth, isFirebaseConfigured } from "@/lib/firebase";
@@ -15,6 +14,7 @@ export default function CorpusPage() {
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "saving" | "analyzing" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [ingestInfo, setIngestInfo] = useState<string | null>(null);
 
   // Form for multiple custom articles
   const [customArticles, setCustomArticles] = useState<Array<{ title: string; content: string }>>([
@@ -67,6 +67,7 @@ export default function CorpusPage() {
     if (!user) return;
     setStatus("saving");
     setError(null);
+    setIngestInfo(null);
     try {
       const token = await user.getIdToken();
       const validCustom = customArticles.filter((a) => a.content.trim().length > 20);
@@ -85,6 +86,15 @@ export default function CorpusPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Ingestion failed");
+
+      const parts = [`Added ${data.added ?? 0} new`];
+      if (typeof data.duplicates === "number" && data.duplicates > 0) {
+        parts.push(`${data.duplicates} already imported`);
+      }
+      if (typeof data.total === "number") parts.push(`${data.total} total`);
+      setIngestInfo(
+        data.note ? `${parts.join(" · ")} — ${data.note}` : parts.join(" · ")
+      );
 
       setCustomArticles([{ title: "", content: "" }]);
       await loadCorpus(user);
@@ -148,6 +158,11 @@ export default function CorpusPage() {
       </div>
 
       {error && <p className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
+      {ingestInfo && status !== "error" && (
+        <p className="mt-4 rounded-xl bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
+          ✓ {ingestInfo}
+        </p>
+      )}
 
       {/* Action Buttons Header */}
       <div className="mt-8 flex flex-wrap gap-3">
