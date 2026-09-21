@@ -130,6 +130,14 @@ export async function handleIncomingMessage(
     return "help";
   }
 
+  // Per-chat /topics rate limiting (max 1 request per 30 seconds)
+  const { checkRateLimit } = await import("./rate-limit");
+  const rate = checkRateLimit(`tg:${chatId}`, 1, 30000);
+  if (!rate.success) {
+    await send("⏳ Please wait 30 seconds between <b>/topics</b> research queries.", true);
+    return "rate-limited";
+  }
+
   // Which user owns this chat? (shared-bot safety)
   const owners = await db
     .collectionGroup("settings")
