@@ -3,8 +3,16 @@ import { NextResponse } from "next/server";
 /**
  * GET /api/diag — deployment health check. Reports presence/validity of
  * server configuration WITHOUT ever returning secret values.
+ * Gated: requires DIAG_SECRET bearer when set, else same as CRON_SECRET.
  */
-export async function GET() {
+export async function GET(req: Request) {
+  const secret = process.env.DIAG_SECRET ?? process.env.CRON_SECRET;
+  if (secret) {
+    const auth = req.headers.get("authorization");
+    if (auth !== `Bearer ${secret}`) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
   const web = {
     apiKey: Boolean(process.env.NEXT_PUBLIC_FIREBASE_API_KEY),
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? null,
@@ -21,15 +29,14 @@ export async function GET() {
       const { cert } = await import("firebase-admin/app");
       cert(sa as Parameters<typeof cert>[0]);
       adminInit = "ok";
-    } catch (e) {
-      adminInit = e instanceof Error ? e.message.split("\n")[0].slice(0, 160) : "failed";
+    } catch {
+      adminInit = "failed";
     }
   }
 
   return NextResponse.json({
     env: {
       hasServiceAccount: raw.length > 0,
-      saLen: raw.length,
       saJsonValid,
       saProject,
       adminInit,
