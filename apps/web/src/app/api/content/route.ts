@@ -118,12 +118,14 @@ export async function POST(req: Request) {
     } else {
       try {
         const top = ideas[0];
+        const { loadVoiceProfile } = await import("@/lib/corpus/voice-analyzer");
+        const voiceGuide = await loadVoiceProfile(db, uid);
         const text = await generateDraft(settings.groqKey, {
           title: top.title,
           angle: top.angle,
           format: top.format,
           sourceUrls: top.sourceUrls,
-        });
+        }, voiceGuide);
         const ref = db.collection(`users/${uid}/drafts`).doc();
         await ref.set({
           ideaId: ideaIds[0],

@@ -62,7 +62,9 @@ export async function POST(req: Request) {
 
   let refined: { text: string; model: string };
   try {
-    refined = await refineForLinkedin(settings.groqKey, draft.title, draft.body);
+    const { loadVoiceProfile } = await import("@/lib/corpus/voice-analyzer");
+    const voiceGuide = await loadVoiceProfile(db, uid);
+    refined = await refineForLinkedin(settings.groqKey, draft.title, draft.body, voiceGuide);
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? `LinkedIn refine failed: ${e.message}` : "LinkedIn refine failed" },

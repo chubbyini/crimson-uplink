@@ -79,7 +79,9 @@ export async function POST(req: Request) {
 
   let edited: { text: string; model: string };
   try {
-    edited = await editDraftWithGroq(settings.groqKey, bodyToEdit, prompt.trim());
+    const { loadVoiceProfile } = await import("@/lib/corpus/voice-analyzer");
+    const voiceGuide = await loadVoiceProfile(db, uid);
+    edited = await editDraftWithGroq(settings.groqKey, bodyToEdit, prompt.trim(), voiceGuide);
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? `Groq edit failed: ${e.message}` : "Groq edit failed" },

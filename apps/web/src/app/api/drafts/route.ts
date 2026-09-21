@@ -71,6 +71,15 @@ export async function POST(req: Request) {
     sourceUrls: string[];
     status: string;
   };
+  if (idea.status !== "approved" && idea.status !== "drafted") {
+    return NextResponse.json({ error: "Approve the idea first" }, { status: 400 });
+  }
+  if (!idea.title?.trim() || !idea.angle?.trim()) {
+    return NextResponse.json({ error: "Idea is missing title/angle" }, { status: 400 });
+  }
+
+  const { loadVoiceProfile } = await import("@/lib/corpus/voice-analyzer");
+  const voiceGuide = await loadVoiceProfile(db, uid);
 
   let draft: { text: string; model: string };
   try {
@@ -79,7 +88,7 @@ export async function POST(req: Request) {
       angle: idea.angle,
       format: idea.format,
       sourceUrls: idea.sourceUrls ?? [],
-    });
+    }, voiceGuide);
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? `Groq failed: ${e.message}` : "Groq failed" },

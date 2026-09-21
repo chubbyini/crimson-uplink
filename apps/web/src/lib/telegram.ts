@@ -167,6 +167,7 @@ export async function handleIncomingMessage(
   const { searchTopics } = await import("./search");
   const { scoreIdeas } = await import("./ideas/score");
   const { storeItems } = await import("./pipeline");
+  const { loadVoiceProfile } = await import("./corpus/voice-analyzer");
 
   const settingsSnap = await db.doc(`users/${uid}/settings/config`).get();
   const settings = SettingsSchema.parse(settingsSnap.data());

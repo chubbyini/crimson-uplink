@@ -10,16 +10,28 @@ export interface DraftInput {
   sourceUrls: string[];
 }
 
-let styleCache: string | null = null;
+const styleCache = new Map<string, { text: string; at: number }>();
+const STYLE_TTL_MS = 5 * 60 * 1000;
 
-async function styleGuide(): Promise<string> {
-  if (styleCache) return styleCache;
+async function styleGuide(cacheKey = "global"): Promise<string> {
+  const hit = styleCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < STYLE_TTL_MS) return hit.text;
+  let text: string;
   try {
-    styleCache = await readFile(join(process.cwd(), "style.md"), "utf8");
+    text = await readFile(join(process.cwd(), "style.md"), "utf8");
   } catch {
-    styleCache = "Write clearly and concretely for developers.";
+    text = "Write clearly and concretely for developers.";
   }
-  return styleCache;
+  styleCache.set(cacheKey, { text, at: Date.now() });
+  return text;
+}
+
+/** For tests / per-user voice: allow explicit cache seeding + clearing. */
+export function __setStyleCacheForTest(key: string, text: string) {
+  styleCache.set(key, { text, at: Date.now() });
+}
+export function __clearStyleCacheForTest() {
+  styleCache.clear();
 }
 
 /**
