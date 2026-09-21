@@ -24,9 +24,15 @@ export async function POST(req: Request) {
   }
 
   const expected = process.env.TELEGRAM_WEBHOOK_SECRET;
-  if (expected) {
+  if (!expected) {
+    return NextResponse.json(
+      { ok: false, error: "Set TELEGRAM_WEBHOOK_SECRET in server env." },
+      { status: 503 }
+    );
+  }
+  {
     const got = req.headers.get("x-telegram-bot-api-secret-token");
-    if (got !== expected) return NextResponse.json({ ok: false }, { status: 401 });
+    if (got !== expected) return NextResponse.json({ ok: false }, { status: 403 });
   }
 
   const update = (await req.json()) as {

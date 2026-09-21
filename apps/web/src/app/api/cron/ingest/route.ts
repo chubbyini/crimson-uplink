@@ -14,9 +14,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Server not configured" }, { status: 503 });
   }
 
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    return NextResponse.json(
+      { error: "Set CRON_SECRET in server env (see apps/web/.env.example)." },
+      { status: 503 }
+    );
+  }
   const authHeader = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized cron execution" }, { status: 401 });
+  if (authHeader !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const db = adminDb();
