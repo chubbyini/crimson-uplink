@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
-import { decryptSettingsSecrets, encryptSettingsSecrets } from "@/lib/crypto";
+import {
+  decryptSettingsSecrets,
+  encryptSettingsSecrets,
+  isMaskedSecret,
+  maskSettingsSecrets,
+} from "@/lib/crypto";
 import { SettingsSchema, type Settings } from "@/lib/settings";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -8,8 +13,10 @@ export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const SECRET_FIELDS = ["geminiKey", "groqKey", "devtoKey", "linkedinToken", "githubToken"] as const;
+
 /**
- * GET /api/settings — get user settings (secrets decrypted).
+ * GET /api/settings — get user settings (secret API keys are MASKED in the response).
  */
 export async function GET(req: Request) {
   if (!isAdminConfigured) {
@@ -35,13 +42,16 @@ export async function GET(req: Request) {
 
   const raw = snap.data() || {};
   const decrypted = decryptSettingsSecrets(raw);
-  const settings = SettingsSchema.parse(decrypted);
+  const parsed = SettingsSchema.parse(decrypted);
 
-  return NextResponse.json({ settings });
+  // Mask secrets so plain API keys are NEVER exposed in client API responses
+  const masked = maskSettingsSecrets(parsed as Record<string, unknown>);
+
+  return NextResponse.json({ settings: masked });
 }
 
 /**
- * POST /api/settings — save user settings (secrets encrypted with AES-256-GCM).
+ * POST /api/settings — save user settings (encrypts secrets with AES-256-GCM, masks response).
  */
 export async function POST(req: Request) {
   if (!isAdminConfigured) {
@@ -73,10 +83,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing settings payload" }, { status: 400 });
   }
 
-  const parsed = SettingsSchema.parse(settings);
+  const db = adminDb();
+  const snap = await db.doc(`users/${uid}/settings/config`).get();
+  const existingRaw = snap.exists ? snap.data() || {} : {};
+  const existingDecrypted = decryptSettingsSecrets(existingRaw) as Record<string, unknown>;
+
+  // Merge incoming secret keys: preserve existing decrypted keys if incoming is masked or empty
+  const incoming = { ...settings } as Record<string, unknown>;
+  for (const field of SECRET_FIELDS) {
+    const val = incoming[field];
+    if (typeof val === "string" && (isMaskedSecret(val) || val.trim() === "")) {
+      if (existingDecrypted[field] && typeof existingDecrypted[field] === "string") {
+        incoming[field] = existingDecrypted[field];
+      }
+    }
+  }
+
+  const parsed = SettingsSchema.parse(incoming);
   const encrypted = encryptSettingsSecrets(parsed as Record<string, unknown>);
 
-  const db = adminDb();
   const now = new Date().toISOString();
 
   const batch = db.batch();
@@ -93,5 +118,8 @@ export async function POST(req: Request) {
 
   await batch.commit();
 
-  return NextResponse.json({ success: true, settings: parsed });
+  // Return response with secret fields masked
+  const maskedResponse = maskSettingsSecrets(parsed as Record<string, unknown>);
+
+  return NextResponse.json({ success: true, settings: maskedResponse });
 }

@@ -53,6 +53,19 @@ export function decryptField(ciphertext: string): string {
 
 const SECRET_FIELDS = ["geminiKey", "groqKey", "devtoKey", "linkedinToken", "githubToken"] as const;
 
+/** Mask a secret string so it never exposes full plaintext over HTTP. */
+export function maskSecret(secret: string): string {
+  if (!secret || secret.trim() === "") return "";
+  const s = secret.trim();
+  if (s.length <= 8) return "••••••••";
+  return `${s.slice(0, 4)}••••••••${s.slice(-4)}`;
+}
+
+/** Check if a string is a masked secret indicator. */
+export function isMaskedSecret(str: string): boolean {
+  return typeof str === "string" && str.includes("••••");
+}
+
 /** Encrypt all secret API key fields in a settings object. */
 export function encryptSettingsSecrets<T extends Record<string, unknown>>(settings: T): T {
   const result = { ...settings };
@@ -74,3 +87,16 @@ export function decryptSettingsSecrets<T extends Record<string, unknown>>(settin
   }
   return result as T;
 }
+
+/** Return a copy of settings with secret fields masked for client API responses. */
+export function maskSettingsSecrets<T extends Record<string, unknown>>(settings: T): T {
+  const result = { ...settings };
+  for (const field of SECRET_FIELDS) {
+    if (typeof result[field] === "string" && result[field]) {
+      const plain = decryptField(result[field] as string);
+      (result as Record<string, unknown>)[field] = maskSecret(plain);
+    }
+  }
+  return result as T;
+}
+
