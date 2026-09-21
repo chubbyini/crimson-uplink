@@ -4,6 +4,7 @@ import { loadSettings, scoreForUser } from "@/lib/pipeline";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 /**
  * POST /api/ideas — score the user's freshest items into a top-10 idea bank.

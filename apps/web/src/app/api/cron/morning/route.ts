@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { adminAuth, adminDb, isAdminConfigured } from "@/lib/firebase-admin";
 import { ingestForUser, loadSettings, scoreForUser } from "@/lib/pipeline";
 
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 /**
  * GET /api/cron/morning — scheduled morning run for ALL users with ingest
  * enabled. Loops users/{uid}/settings, runs ingest → ideas → digest per user

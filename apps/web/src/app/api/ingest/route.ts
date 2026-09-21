@@ -4,6 +4,7 @@ import { ingestForUser, loadSettings } from "@/lib/pipeline";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 /**
  * POST /api/ingest — run the morning pull on demand for the signed-in user.
