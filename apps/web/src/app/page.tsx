@@ -1,4 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import Dashboard from "@/components/Dashboard";
 import CarmineTitle from "@/components/CarmineTitle";
 import ThemedTextFrame from "@/components/ThemedTextFrame";
 import PipelineVisualizer from "@/components/PipelineVisualizer";
@@ -6,7 +12,7 @@ import BioMechSimulator from "@/components/BioMechSimulator";
 import MechDesignerStats from "@/components/MechDesignerStats";
 import VoiceMatrixCard from "@/components/VoiceMatrixCard";
 
-export default function Home() {
+export function Landing() {
   return (
     <main className="flex w-full flex-col items-center px-3 py-8 sm:px-8 md:py-16 overflow-x-hidden">
       <div className="w-full max-w-6xl space-y-12 sm:space-y-16">
@@ -144,4 +150,31 @@ export default function Home() {
       </div>
     </main>
   );
+}
+
+export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
+  const [ready, setReady] = useState(() => !auth);
+
+  useEffect(() => {
+    if (!auth) return;
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setReady(true);
+    });
+  }, []);
+
+  if (!ready) {
+    return (
+      <main className="flex w-full justify-center px-4 py-24">
+        <div className="flex items-center gap-2 font-mono text-xs tracking-widest text-sky-400">
+          <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse" />
+          <span>UPLINKING QUANTUM MATRIX…</span>
+        </div>
+      </main>
+    );
+  }
+
+  if (!user) return <Landing />;
+  return <Dashboard user={user} />;
 }
