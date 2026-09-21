@@ -35,7 +35,14 @@ export async function publishToLinkedin(
   token: string,
   text: string
 ): Promise<LinkedinPublishResult> {
-  const commentary = text.length > 3000 ? text.slice(0, 2997) + "…" : text;
+  let commentary = text.trim();
+  if (commentary.length > 3000) {
+    // Cut at a word boundary to avoid mid-word / split emoji.
+    let cut = commentary.slice(0, 2997);
+    const lastSpace = cut.lastIndexOf(" ");
+    if (lastSpace > 2500) cut = cut.slice(0, lastSpace);
+    commentary = cut + "…";
+  }
   const author = await getPersonUrn(token);
 
   const res = await fetch("https://api.linkedin.com/rest/posts?trk=crimson_uplink", {

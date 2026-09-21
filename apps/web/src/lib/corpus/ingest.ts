@@ -115,16 +115,30 @@ export async function storeCorpusItems(
   uid: string,
   items: Omit<CorpusItem, "id">[]
 ): Promise<{ added: number; total: number }> {
+  const capped = items.slice(0, 50).map((i) => ({
+    ...i,
+    title: (i.title ?? "").slice(0, 300),
+    body: (i.body ?? "").slice(0, 60000),
+  }));
   const batch = db.batch();
   let added = 0;
 
-  for (const item of items) {
-    const rawId = item.url ? urlHash(item.url) : urlHash(item.title + item.body.slice(0, 50));
-    const ref = db.doc(`users/${uid}/corpus/${rawId}`);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      batch.set(ref, { ...item, id: rawId });
-      added++;
+  for (const item of capped) {
+    let rawId: string;
+    try {
+      rawId = item.url ? urlHash(item.url) : urlHash(item.title + item.body.slice(0, 50));
+    } catch {
+      continue;
+    }
+    try {
+      const ref = db.doc(`users/${uid}/corpus/${rawId}`);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        batch.set(ref, { ...item, id: rawId });
+        added++;
+      }
+    } catch {
+      continue;
     }
   }
 

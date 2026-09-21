@@ -34,6 +34,12 @@ export async function sendDigest(
 ) {
   const b = getBot();
   if (!b) throw new Error("Telegram not configured (TELEGRAM_BOT_TOKEN)");
+  for (const idea of ideas) {
+    const probe = `ia:${uid}:${idea.id}`;
+    if (probe.length > 64) {
+      throw new Error(`Telegram callback_data exceeds 64 bytes for idea ${idea.id} (uid too long)`);
+    }
+  }
 
   const lines = ideas.map((idea, n) => {
     const link = idea.sourceUrls[0] ?? "";
@@ -45,7 +51,7 @@ export async function sendDigest(
     );
   });
 
-  await b.api.sendMessage(chatId, `<b>Crimson Uplink — top 10</b>\n\n${lines.join("\n\n")}`, {
+  await b.api.sendMessage(chatId, `<b>Crimson Uplink — top ${ideas.length}</b>\n\n${lines.join("\n\n")}`, {
     parse_mode: "HTML",
     link_preview_options: { is_disabled: true },
     reply_markup: {
@@ -77,6 +83,14 @@ export async function sendDigest(
     return "unknown";
   }
   const [, action, uid, ideaId] = m;
+  const { assertDocId } = await import("./validation");
+  let safeIdeaId: string;
+  try {
+    safeIdeaId = assertDocId(ideaId, "ideaId");
+  } catch {
+    await b.api.answerCallbackQuery(callbackId, { text: "Invalid idea" });
+    return "invalid";
+  }
 
   // Dynamic import keeps firebase-admin out of edge-cold paths; lazy is fine.
   const { adminDb } = await import("./firebase-admin");
@@ -90,9 +104,14 @@ export async function sendDigest(
     return "forbidden";
   }
 
-  await db.doc(`users/${uid}/ideas/${ideaId}`).update({
-    status: action === "a" ? "approved" : "skipped",
-  });
+  try {
+    await db.doc(`users/${uid}/ideas/${safeIdeaId}`).update({
+      status: action === "a" ? "approved" : "skipped",
+    });
+  } catch {
+    await b.api.answerCallbackQuery(callbackId, { text: "Idea no longer exists" });
+    return "gone";
+  }
   await b.api.answerCallbackQuery(callbackId, {
     text: action === "a" ? "Approved ✓" : "Skipped",
   });

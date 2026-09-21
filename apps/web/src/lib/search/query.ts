@@ -69,24 +69,31 @@ export async function searchGithub(
 }
 
 /** Lobsters hottest feed, keyword-filtered. No key; Reddit blocks server fetches. */
+const lobstersCache = { at: 0, data: null as Array<{
+    short_id?: string;
+    title?: string;
+    url?: string;
+    score?: number;
+    comment_count?: number;
+    createdAt?: string;
+    created_at?: string;
+    description_plain?: string;
+  }> | null };
 export async function searchLobsters(topic: string): Promise<RawItem[]> {
   const words = topic
     .toLowerCase()
     .split(/\s+/)
     .filter((w) => w.length > 2);
   if (!words.length) return [];
-  const res = await safeFetch("https://lobste.rs/hottest.json");
-  if (!res.ok) return [];
-  const stories = (await res.json()) as Array<{
-    short_id?: string;
-    title?: string;
-    url?: string;
-    score?: number;
-    comment_count?: number;
-    created_at?: string;
-    description_plain?: string;
-  }>;
-  return stories
+  let stories = lobstersCache.data;
+  if (!stories || Date.now() - lobstersCache.at > 5 * 60 * 1000) {
+    const res = await safeFetch("https://lobste.rs/hottest.json");
+    if (!res.ok) return [];
+    stories = (await res.json()) as typeof lobstersCache.data extends null ? never : NonNullable<typeof lobstersCache.data>;
+    lobstersCache.data = stories;
+    lobstersCache.at = Date.now();
+  }
+  return (stories ?? [])
     .filter(
       (s) =>
         s.title &&
@@ -100,7 +107,7 @@ export async function searchLobsters(topic: string): Promise<RawItem[]> {
       url: s.url as string,
       source: "rss" as const,
       sourceId: s.short_id,
-      publishedAt: s.created_at,
+      publishedAt: s.created_at ?? s.createdAt,
       points: s.score,
       commentCount: s.comment_count,
     }));

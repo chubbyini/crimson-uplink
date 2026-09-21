@@ -24,7 +24,7 @@ export async function analyzeUserVoice(
   const sampleSummaries = items.map(
     (item, index) =>
       `--- SAMPLE ${index + 1}: ${item.title} (${item.source}) ---\n` +
-      item.body.slice(0, 2500)
+      (item.body ?? "").slice(0, 2000)
   );
 
   const google = createGoogleGenerativeAI({ apiKey: geminiKey });

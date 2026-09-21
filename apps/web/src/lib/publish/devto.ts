@@ -23,14 +23,16 @@ export async function publishToDevto(
   let articleTitle = input.title.trim();
   let bodyMarkdown = input.bodyMarkdown.trim();
 
+  // Strip YAML frontmatter if present, then a leading H1 (with optional whitespace).
+  bodyMarkdown = bodyMarkdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, "").trimStart();
   // If bodyMarkdown starts with an H1 header (# Title), extract it as the title and remove from body markdown
-  const leadingH1Match = bodyMarkdown.match(/^#\s+(.+?)(\r?\n+|$)/);
+  const leadingH1Match = bodyMarkdown.match(/^\s*#\s+(.+?)(\r?\n+|$)/);
   if (leadingH1Match) {
     const extractedTitle = leadingH1Match[1].replace(/[*_#]/g, "").trim();
     if (extractedTitle) {
       articleTitle = extractedTitle;
     }
-    bodyMarkdown = bodyMarkdown.replace(/^#\s+.+?(\r?\n+|$)/, "").trim();
+    bodyMarkdown = bodyMarkdown.replace(/^\s*#\s+.+?(\r?\n+|$)/, "").trim();
   }
 
   const res = await fetch("https://dev.to/api/articles", {
