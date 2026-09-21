@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured } from "@/lib/firebase-admin";
-import { ingestForUser, loadSettings } from "@/lib/pipeline";
+import { ingestForUser, loadSettings, mapWithConcurrency, withTimeout } from "@/lib/pipeline";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -28,19 +28,18 @@ export async function GET(req: Request) {
 
   const db = adminDb();
   const usersSnap = await db.collection("users").get();
-  const results: Record<string, unknown> = {};
-
-  for (const doc of usersSnap.docs) {
+  const entries = await mapWithConcurrency(usersSnap.docs, 3, async (doc) => {
     const uid = doc.id;
     try {
       const settings = await loadSettings(db, uid);
-      if (!settings || settings.ingestEnabled === false) continue;
-      const res = await ingestForUser(db, uid, settings);
-      results[uid] = res;
+      if (!settings || settings.ingestEnabled === false) return [uid, { skipped: true }] as const;
+      const res = await withTimeout(ingestForUser(db, uid, settings), 45000, `ingest:${uid}`);
+      return [uid, res] as const;
     } catch (e) {
-      results[uid] = { error: e instanceof Error ? e.message : "Ingest failed" };
+      return [uid, { error: e instanceof Error ? e.message : "Ingest failed" }] as const;
     }
-  }
+  });
+  const results: Record<string, unknown> = Object.fromEntries(entries);
 
   return NextResponse.json({ step: "ingest", timestamp: new Date().toISOString(), results });
 }

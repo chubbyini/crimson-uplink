@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured } from "@/lib/firebase-admin";
-import { ingestForUser, loadSettings, scoreForUser } from "@/lib/pipeline";
+import { ingestForUser, loadSettings, mapWithConcurrency, scoreForUser, withTimeout } from "@/lib/pipeline";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -29,32 +29,32 @@ export async function GET(req: Request) {
   if (token !== secret) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const db = adminDb();
-  const results: Array<Record<string, unknown>> = [];
 
   // Users registry: users/{uid}/profile docs written on Settings save.
   // (Avoids firebase-admin/auth listUsers, whose ESM chain breaks some runtimes.)
+  // Bounded concurrency + per-user timeout: one slow user can't kill the run.
   const profiles = await db.collection("users").get();
-  for (const doc of profiles.docs) {
+  const results = await mapWithConcurrency(profiles.docs, 2, async (doc) => {
     const uid = doc.id;
     const entry: Record<string, unknown> = { uid };
     try {
       const settings = await loadSettings(db, uid);
       if (!settings || !settings.ingestEnabled) {
         entry.skipped = settings ? "ingest disabled" : "no settings";
-        results.push(entry);
-        continue;
+        return entry;
       }
-      entry.ingest = await ingestForUser(db, uid, settings);
+      entry.ingest = await withTimeout(ingestForUser(db, uid, settings), 45000, `ingest:${uid}`);
       try {
-        entry.ideas = await scoreForUser(db, uid, settings);
+        const topics = [...(settings.devtoTags ?? []), ...(settings.npmPackages ?? [])].slice(0, 8);
+        entry.ideas = await withTimeout(scoreForUser(db, uid, settings, topics), 50000, `score:${uid}`);
       } catch (e) {
         entry.ideasError = e instanceof Error ? e.message : "scoring failed";
       }
     } catch (e) {
       entry.error = e instanceof Error ? e.message.split("\n")[0] : "failed";
     }
-    results.push(entry);
-  }
+    return entry;
+  });
 
   return NextResponse.json({ users: results.length, results });
 }

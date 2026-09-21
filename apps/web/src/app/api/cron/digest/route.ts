@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured } from "@/lib/firebase-admin";
-import { loadSettings } from "@/lib/pipeline";
+import { loadSettings, mapWithConcurrency, withTimeout } from "@/lib/pipeline";
 import { sendDigest } from "@/lib/telegram";
 import { checkRunIdempotency } from "@/lib/idempotency";
 import type { StoredIdea } from "@/lib/ideas/schema";
@@ -34,19 +34,16 @@ export async function GET(req: Request) {
 
   const db = adminDb();
   const usersSnap = await db.collection("users").get();
-  const results: Record<string, unknown> = {};
-
-  for (const doc of usersSnap.docs) {
+  const entries = await mapWithConcurrency(usersSnap.docs, 3, async (doc) => {
     const uid = doc.id;
     try {
       const settings = await loadSettings(db, uid);
-      if (!settings?.telegramChatId || !process.env.TELEGRAM_BOT_TOKEN) continue;
+      if (!settings?.telegramChatId || !process.env.TELEGRAM_BOT_TOKEN) return [uid, { skipped: true }] as const;
 
       // Idempotency check: prevent duplicate Telegram digests for the same run ID
       const idempotency = await checkRunIdempotency(db, uid, runId, "telegram_digest");
       if (idempotency.isDuplicate) {
-        results[uid] = { skipped: true, reason: "Already executed for runId", runId };
-        continue;
+        return [uid, { skipped: true, reason: "Already executed for runId", runId }] as const;
       }
 
       const ideasSnap = await db
@@ -58,16 +55,16 @@ export async function GET(req: Request) {
 
       const ideas = ideasSnap.docs.map((d) => ({ id: d.id, ...(d.data() as StoredIdea) }));
       if (!ideas.length) {
-        results[uid] = { sent: false, reason: "No new ideas to digest" };
-        continue;
+        return [uid, { sent: false, reason: "No new ideas to digest" }] as const;
       }
 
-      await sendDigest(settings.telegramChatId.trim(), uid, ideas);
-      results[uid] = { sent: true, count: ideas.length, runId };
+      await withTimeout(sendDigest(settings.telegramChatId.trim(), uid, ideas), 20000, `digest:${uid}`);
+      return [uid, { sent: true, count: ideas.length, runId }] as const;
     } catch (e) {
-      results[uid] = { error: e instanceof Error ? e.message : "Digest failed" };
+      return [uid, { error: e instanceof Error ? e.message : "Digest failed" }] as const;
     }
-  }
+  });
+  const results: Record<string, unknown> = Object.fromEntries(entries);
 
   return NextResponse.json({ step: "digest", runId, timestamp: new Date().toISOString(), results });
 }

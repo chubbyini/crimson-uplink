@@ -62,8 +62,15 @@ export async function POST(req: Request) {
     .where("platform", "==", "devto")
     .get();
 
-  const batch = db.batch();
   let updated = 0;
+  const BATCH_CHUNK = 400;
+  let batch = db.batch();
+  let pending = 0;
+  const flush = async () => {
+    if (pending) await batch.commit();
+    batch = db.batch();
+    pending = 0;
+  };
   for (const doc of pubs.docs) {
     const devtoId = (doc.data() as { devtoId?: number }).devtoId;
     const match = devtoId != null ? byId.get(devtoId) : undefined;
@@ -80,8 +87,10 @@ export async function POST(req: Request) {
       { merge: true }
     );
     updated += 1;
+    pending += 1;
+    if (pending >= BATCH_CHUNK) await flush();
   }
-  if (updated) await batch.commit();
+  await flush();
 
   return NextResponse.json({ checked: pubs.size, updated });
 }

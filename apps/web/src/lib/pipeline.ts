@@ -112,7 +112,8 @@ export async function ingestForUser(
 export async function scoreForUser(
   db: Firestore,
   uid: string,
-  settings: Settings
+  settings: Settings,
+  topics?: string[]
 ): Promise<ScoreResult> {
   if (!settings.geminiKey) throw new Error("Add your Gemini API key in Settings first");
 
@@ -144,7 +145,7 @@ export async function scoreForUser(
 
   let ideas;
   try {
-    ideas = await scoreIdeas(settings.geminiKey, items);
+    ideas = await scoreIdeas(settings.geminiKey, items, topics);
   } catch (e) {
     throw new Error(
       e instanceof Error ? `Gemini failed: ${e.message}` : "Gemini failed"
@@ -189,5 +190,45 @@ export async function loadSettings(db: Firestore, uid: string): Promise<Settings
   if (!snap.exists) return null;
   const rawData = snap.data() || {};
   const decrypted = decryptSettingsSecrets(rawData);
-  return SettingsSchema.parse(decrypted);
+  const parsed = SettingsSchema.safeParse(decrypted);
+  if (!parsed.success) {
+    console.error(`[settings] corrupt doc for ${uid}:`, parsed.error.issues.slice(0, 3));
+    // Return defaults merged with any valid keys so one bad field can't 500 every route.
+    const fallback = SettingsSchema.safeParse({});
+    return fallback.success ? fallback.data : null;
+  }
+  return parsed.data;
+}
+
+/** Run async jobs with bounded concurrency (cron fan-out safety). */
+export async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+/** Reject if fn takes longer than ms (per-user cron timeout). */
+export async function withTimeout<T>(fn: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      fn,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
