@@ -35,3 +35,12 @@ export function urlHash(raw: string): string {
     .digest("hex")
     .slice(0, 16);
 }
+
+/**
+ * 16-hex-char hash of arbitrary text (no URL parsing).
+ * Use for items without a URL (e.g. pasted corpus samples) — urlHash would
+ * throw on plain text and the item would be silently skipped.
+ */
+export function contentHash(raw: string): string {
+  return createHash("sha256").update(raw).digest("hex").slice(0, 16);
+}

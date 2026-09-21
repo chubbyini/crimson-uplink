@@ -108,5 +108,14 @@ export async function POST(req: Request) {
 
   const result = await storeCorpusItems(db, uid, toStore);
 
-  return NextResponse.json({ success: true, added: result.added, total: result.total });
+  return NextResponse.json({
+    success: true,
+    added: result.added,
+    duplicates: result.duplicates,
+    total: result.total,
+    note:
+      result.added === 0 && result.duplicates > 0
+        ? "All items already imported — nothing new added"
+        : undefined,
+  });
 }

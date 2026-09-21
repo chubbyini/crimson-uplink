@@ -1,6 +1,6 @@
 import type { Firestore } from "firebase-admin/firestore";
 import type { CorpusItem } from "./types";
-import { urlHash } from "@/lib/ingest/normalize";
+import { contentHash, urlHash } from "@/lib/ingest/normalize";
 
 /** Ingest user's published articles from Dev.to API. */
 export async function fetchDevtoCorpus(devtoKey: string): Promise<Omit<CorpusItem, "id">[]> {
@@ -114,7 +114,7 @@ export async function storeCorpusItems(
   db: Firestore,
   uid: string,
   items: Omit<CorpusItem, "id">[]
-): Promise<{ added: number; total: number }> {
+): Promise<{ added: number; duplicates: number; total: number }> {
   const capped = items.slice(0, 50).map((i) => ({
     ...i,
     title: (i.title ?? "").slice(0, 300),
@@ -122,11 +122,14 @@ export async function storeCorpusItems(
   }));
   const batch = db.batch();
   let added = 0;
+  let duplicates = 0;
 
   for (const item of capped) {
     let rawId: string;
     try {
-      rawId = item.url ? urlHash(item.url) : urlHash(item.title + item.body.slice(0, 50));
+      rawId = item.url
+        ? urlHash(item.url)
+        : contentHash(`${item.title}\n${item.body.slice(0, 500)}`);
     } catch {
       continue;
     }
@@ -136,6 +139,8 @@ export async function storeCorpusItems(
       if (!snap.exists) {
         batch.set(ref, { ...item, id: rawId });
         added++;
+      } else {
+        duplicates++;
       }
     } catch {
       continue;
@@ -147,5 +152,5 @@ export async function storeCorpusItems(
   }
 
   const allSnap = await db.collection(`users/${uid}/corpus`).get();
-  return { added, total: allSnap.size };
+  return { added, duplicates, total: allSnap.size };
 }
