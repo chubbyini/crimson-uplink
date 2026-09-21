@@ -70,7 +70,7 @@ export default function ContentPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Content</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 text-slate-400">
           Configure Firebase first (see docs/FIREBASE_SETUP.md).
         </p>
       </main>
@@ -80,7 +80,7 @@ export default function ContentPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Content</h1>
-        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
+        <p className="mt-4 text-sm text-slate-500">Loading…</p>
       </main>
     );
   }
@@ -88,20 +88,19 @@ export default function ContentPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Content</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 text-slate-400">
           Sign in with Google (top right) to research topics.
         </p>
       </main>
     );
   }
 
-  const inputCls =
-    "mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-black dark:border-white/15 dark:bg-zinc-950 dark:text-zinc-100";
+  const inputCls = "input mt-1";
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-12">
-      <h1 className="text-2xl font-semibold">Content</h1>
-      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+      <h1 className="ui-title">Content</h1>
+      <p className="ui-sub">
         Enter topics — searches HN, GitHub, Lobsters, Stack Overflow, Dev.to
         and Medium live, scores ideas with Gemini, and drafts the top one with
         Groq. Results land in your bank too.
@@ -120,20 +119,20 @@ export default function ContentPage() {
         <button
           type="submit"
           disabled={busy}
-          className="mt-3 flex h-11 items-center rounded-full bg-red-700 px-6 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
+          className="btn-primary-lg mt-3 flex h-11 items-center"
         >
           {busy ? "Researching… (up to a minute)" : "Research topics"}
         </button>
       </form>
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
       {result && (
         <section className="mt-8">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-slate-400">
             Searched {result.fetched} · unique {result.unique} · new{" "}
             {result.added}.
           </p>
           {result.draft ? (
-            <p className="mt-2 text-sm text-green-600">
+            <p className="mt-2 text-sm text-emerald-400">
               Draft ready:{" "}
               <Link href="/drafts" className="underline">
                 {result.draft.title}
@@ -141,25 +140,25 @@ export default function ContentPage() {
             </p>
           ) : (
             result.draftNote && (
-              <p className="mt-2 text-sm text-amber-600">{result.draftNote}</p>
+              <p className="mt-2 text-sm text-amber-400">{result.draftNote}</p>
             )
           )}
           <ul className="mt-4 flex flex-col gap-3">
             {result.ideas.map((idea) => (
               <li
                 key={idea.id}
-                className="rounded-2xl border border-black/10 bg-white p-4 dark:border-white/10 dark:bg-zinc-950"
+                className="ui-panel p-4"
               >
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="rounded-full bg-black/5 px-2 py-0.5 font-mono uppercase dark:bg-white/10">
+                  <span className="meta-pill uppercase">
                     {idea.format}
                   </span>
-                  <span className="font-mono text-zinc-500">{idea.score}/10</span>
+                  <span className="font-mono text-slate-500">{idea.score}/10</span>
                 </div>
-                <p className="mt-1 font-medium text-slate-800 dark:text-slate-100">
+                <p className="mt-1 font-medium text-slate-100">
                   {idea.title}
                 </p>
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                <p className="mt-1 text-sm text-slate-400">
                   {idea.angle}
                 </p>
               </li>

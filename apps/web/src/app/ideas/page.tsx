@@ -131,7 +131,7 @@ export default function IdeasPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Idea bank</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 text-slate-400">
           Configure Firebase first (see docs/FIREBASE_SETUP.md).
         </p>
       </main>
@@ -141,7 +141,7 @@ export default function IdeasPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Idea bank</h1>
-        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
+        <p className="mt-4 text-sm text-slate-500">Loading…</p>
       </main>
     );
   }
@@ -149,7 +149,7 @@ export default function IdeasPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Idea bank</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 text-slate-400">
           Sign in with Google (top right) to see your ideas.
         </p>
       </main>
@@ -161,18 +161,18 @@ export default function IdeasPage() {
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-12">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Idea bank</h1>
+        <h1 className="ui-title">Idea bank</h1>
         <button
           onClick={scoreNow}
           disabled={status === "scoring" || status === "loading"}
-          className="flex h-10 items-center rounded-full bg-red-700 px-5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
+          className="btn-primary-lg flex h-10 items-center"
         >
           {status === "scoring" ? "Scoring…" : "Score fresh items"}
         </button>
       </div>
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
       {tg && (
-        <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-3 text-sm text-slate-400">
           {tg.sent ? (
             <>Digest sent to Telegram ✓ — approve from your phone or below.</>
           ) : (
@@ -189,11 +189,7 @@ export default function IdeasPage() {
               setCursor(null);
               if (user) void load(user, true, f);
             }}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              filter === f
-                ? "bg-red-700 text-white"
-                : "border border-black/10 text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
-            }`}
+            className={filter === f ? "chip-active" : "chip"}
           >
             {f}
           </button>
@@ -203,32 +199,32 @@ export default function IdeasPage() {
         {visible.map((idea) => (
           <li
             key={idea.id}
-            className="rounded-2xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-zinc-950"
+            className="ui-panel p-5"
           >
             <div className="flex items-center gap-2 text-xs">
-              <span className="rounded-full bg-black/5 px-2 py-0.5 font-mono uppercase dark:bg-white/10">
+              <span className="meta-pill uppercase">
                 {idea.format}
               </span>
-              <span className="rounded-full bg-black/5 px-2 py-0.5 font-mono dark:bg-white/10">
+              <span className="meta-pill">
                 {idea.status} · {idea.score}/10
               </span>
             </div>
-            <p className="mt-2 text-lg font-semibold">{idea.title}</p>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{idea.angle}</p>
-            <p className="mt-2 truncate text-xs text-zinc-500">
+            <p className="mt-2 text-lg font-semibold text-slate-100">{idea.title}</p>
+            <p className="mt-1 text-sm text-slate-400">{idea.angle}</p>
+            <p className="mt-2 truncate text-xs text-slate-500">
               {idea.sourceUrls.join(" · ")}
             </p>
             {idea.status === "new" && (
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => setIdeaStatus(idea.id, "approved")}
-                  className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-800"
+                  className="btn-primary"
                 >
                   Approve
                 </button>
                 <button
                   onClick={() => setIdeaStatus(idea.id, "skipped")}
-                  className="rounded-full border border-black/10 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
+                  className="btn-ghost"
                 >
                   Skip
                 </button>
@@ -265,14 +261,14 @@ export default function IdeasPage() {
                     }
                   }}
                   disabled={drafting === idea.id}
-                  className="rounded-full bg-red-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-800 disabled:opacity-50"
+                  className="btn-primary"
                 >
                   {drafting === idea.id ? "Drafting…" : "Draft with Groq"}
                 </button>
               </div>
             )}
             {idea.status === "drafted" && (
-              <p className="mt-3 text-xs text-zinc-500">
+              <p className="mt-3 text-xs text-slate-500">
                 Drafted — see the{" "}
                 <Link href="/drafts" className="underline">
                   drafts page
@@ -284,13 +280,13 @@ export default function IdeasPage() {
         ))}
       </ul>
       {status === "idle" && !visible.length && (
-        <p className="mt-6 text-sm text-zinc-500">
+        <p className="mt-6 text-sm text-slate-500">
           No ideas yet. Run ingest, then Score fresh items.
         </p>
       )}
       {visible.length > 0 && (
         <div className="mt-6 flex flex-col items-center gap-2">
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-slate-500">
             Showing {visible.length} loaded ideas
             {filter !== "all" ? ` (filtered: ${filter})` : ""}
             {hasMore ? " — load more for the full bank" : ""}
@@ -299,7 +295,7 @@ export default function IdeasPage() {
             <button
               onClick={() => user && load(user)}
               disabled={status === "loading"}
-              className="rounded-full border border-black/10 px-5 py-2 text-xs font-medium text-slate-700 hover:bg-black/5 disabled:opacity-50 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
+              className="btn-ghost"
             >
               {status === "loading" ? "Loading…" : "Load more"}
             </button>

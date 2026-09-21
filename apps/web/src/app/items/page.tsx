@@ -79,7 +79,7 @@ export default function ItemsPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Sources</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 text-slate-400">
           Configure Firebase first (see docs/FIREBASE_SETUP.md).
         </p>
       </main>
@@ -89,7 +89,7 @@ export default function ItemsPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Sources</h1>
-        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
+        <p className="mt-4 text-sm text-slate-500">Loading…</p>
       </main>
     );
   }
@@ -97,7 +97,7 @@ export default function ItemsPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Sources</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 text-slate-400">
           Sign in with Google (top right) to see your ingested articles.
         </p>
       </main>
@@ -108,23 +108,19 @@ export default function ItemsPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-12">
-      <h1 className="text-2xl font-semibold">Sources</h1>
-      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+      <h1 className="ui-title">Sources</h1>
+      <p className="ui-sub">
         {rows.length} articles loaded{hasMore ? " (more available)" : ""}. Run more from Settings → Run ingest
         now.
       </p>
-      {status === "loading" && <p className="mt-3 text-sm text-zinc-500">Loading sources…</p>}
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {status === "loading" && <p className="mt-3 text-sm text-slate-500">Loading sources…</p>}
+      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
         {sources.map((s) => (
           <button
             key={s}
             onClick={() => setFilter(s)}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              filter === s
-                ? "bg-red-700 text-white"
-                : "border border-black/10 text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
-            }`}
+            className={filter === s ? "chip-active" : "chip"}
           >
             {s}
           </button>
@@ -134,26 +130,26 @@ export default function ItemsPage() {
         {visible.map((item) => (
           <li
             key={item.id}
-            className="rounded-2xl border border-black/10 bg-white p-4 dark:border-white/10 dark:bg-zinc-950"
+            className="ui-panel p-4"
           >
             <div className="flex items-center gap-2 text-xs">
-              <span className="rounded-full bg-black/5 px-2 py-0.5 font-mono uppercase dark:bg-white/10">
+              <span className="meta-pill uppercase">
                 {item.source}
               </span>
               {item.points != null && (
-                <span className="font-mono text-zinc-500">
+                <span className="font-mono text-slate-500">
                   {item.points} pts
                 </span>
               )}
               {item.author && (
-                <span className="truncate text-zinc-500">{item.author}</span>
+                <span className="truncate text-slate-500">{item.author}</span>
               )}
             </div>
             <a
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-1 block font-medium hover:underline"
+              className="mt-1 block font-medium text-slate-100 hover:underline"
             >
               {item.title}
             </a>
@@ -161,7 +157,7 @@ export default function ItemsPage() {
         ))}
       </ul>
       {status === "idle" && !visible.length && (
-        <p className="mt-6 text-sm text-zinc-500">
+        <p className="mt-6 text-sm text-slate-500">
           Nothing here yet — run ingest from Settings.
         </p>
       )}
@@ -169,7 +165,7 @@ export default function ItemsPage() {
         <button
           onClick={() => void loadPage(user, false, cursor)}
           disabled={status === "loading-more"}
-          className="mt-6 rounded-full border border-black/10 px-4 py-2 text-sm font-medium disabled:opacity-50 dark:border-white/15"
+          className="btn-ghost mt-6"
         >
           {status === "loading-more" ? "Loading…" : "Load more"}
         </button>

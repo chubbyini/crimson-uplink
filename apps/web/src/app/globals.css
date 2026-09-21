@@ -21,6 +21,57 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Brand tokens: single source of truth for the mission-control palette.
+   <html> always carries class="dark", so these are the always-on values —
+   no light:/dark: split needed in page code. */
+@theme {
+  --color-abyss: #07090e;
+  --color-panel: #020617;
+  --color-primary: #b91c1c;
+  --color-primary-hover: #991b1b;
+  --color-accent-cyan: #38bdf8;
+  --color-accent-crimson: #ff2a55;
+  --color-muted: #94a3b8;
+  --color-faint: #64748b;
+  --color-line: #1e293b;
+}
+
+/* Canonical components — pages compose these instead of
+   hand-rolling card/button/pill/input classes. */
+.ui-title {
+  @apply text-2xl font-semibold text-slate-100;
+}
+.ui-sub {
+  @apply mt-2 text-sm text-slate-400;
+}
+.ui-panel {
+  @apply rounded-2xl border border-slate-800 bg-slate-950/60;
+}
+.btn-primary {
+  @apply rounded-full bg-red-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-800 disabled:opacity-50;
+}
+.btn-primary-lg {
+  @apply rounded-full bg-red-700 px-5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50;
+}
+.btn-primary-sm {
+  @apply rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800 disabled:opacity-50;
+}
+.btn-ghost {
+  @apply rounded-full border border-slate-700 px-4 py-1.5 text-xs font-medium text-slate-200 hover:bg-white/5 disabled:opacity-50;
+}
+.chip {
+  @apply rounded-full border border-slate-700 px-3 py-1 text-xs font-medium text-slate-300 hover:bg-white/5;
+}
+.chip-active {
+  @apply rounded-full bg-red-700 px-3 py-1 text-xs font-medium text-white;
+}
+.input {
+  @apply w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600;
+}
+.meta-pill {
+  @apply rounded-full bg-white/5 px-2 py-0.5 font-mono text-xs text-slate-400;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);

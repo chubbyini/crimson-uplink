@@ -75,8 +75,8 @@ export default function SettingsPage() {
   if (!isFirebaseConfigured) {
     return (
       <main className="mx-auto w-full max-w-2xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+        <h1 className="ui-title">Settings</h1>
+        <p className="mt-4 text-slate-400">
           Firebase isn&apos;t configured yet. Follow{" "}
           <code className="font-mono text-sm">docs/FIREBASE_SETUP.md</code> to
           add your web config, then return here.
@@ -88,16 +88,16 @@ export default function SettingsPage() {
   if (authLoading) {
     return (
       <main className="mx-auto w-full max-w-2xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
+        <h1 className="ui-title">Settings</h1>
+        <p className="mt-4 text-sm text-slate-500">Loading…</p>
       </main>
     );
   }
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-2xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+        <h1 className="ui-title">Settings</h1>
+        <p className="mt-4 text-slate-400">
           Sign in with Google (top right) to manage your keys and sources.
         </p>
       </main>
@@ -143,12 +143,12 @@ export default function SettingsPage() {
   }
 
   const inputCls =
-    "mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-black dark:border-white/15 dark:bg-zinc-950 dark:text-zinc-100";
+    "input mt-1 w-full";
 
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-12">
-      <h1 className="text-2xl font-semibold">Settings</h1>
-      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+      <h1 className="ui-title">Settings</h1>
+      <p className="mt-2 text-sm text-slate-400">
         Bring your own keys — stored under{" "}
         <code className="font-mono">users/{user.uid}/settings</code>, visible
         only to you. Keys are AES-256-GCM encrypted at rest and never returned in plain text.
@@ -286,7 +286,7 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={status === "saving" || status === "loading"}
-            className="flex h-11 items-center rounded-full bg-red-700 px-6 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
+            className="btn-primary-lg flex h-11 items-center"
           >
             {status === "saving" ? "Saving…" : "Save settings"}
           </button>
@@ -296,9 +296,9 @@ export default function SettingsPage() {
           {error && <span className="text-sm text-red-600">{error}</span>}
         </div>
       </form>
-      <section className="mt-10 rounded-2xl border border-black/10 p-5 dark:border-white/10">
+      <section className="ui-panel mt-10 p-5">
         <h2 className="text-base font-semibold">Ingest now</h2>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-slate-400">
           Pulls HN front page + your RSS feeds + YouTube channels into{" "}
           <code className="font-mono">users/{user.uid}/items</code>, deduped by
           URL hash. Needs server env{" "}
@@ -333,12 +333,12 @@ export default function SettingsPage() {
               setIngesting(false);
             }
           }}
-          className="mt-3 flex h-10 items-center rounded-full border border-black/10 px-5 text-sm font-medium text-slate-700 hover:bg-black/5 disabled:opacity-50 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
+          className="btn-ghost mt-3 flex h-10 items-center"
         >
           {ingesting ? "Ingesting…" : "Run ingest now"}
         </button>
         {ingest && (
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-sm text-slate-400">
             Fetched {ingest.fetched} · unique {ingest.unique} · added{" "}
             {ingest.added} · seen before {ingest.seenBefore}. Next:{" "}
             <Link href="/items" className="underline">

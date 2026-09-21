@@ -155,7 +155,7 @@ export default function AnalyticsPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Analytics</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 text-slate-400">
           Configure Firebase first (see docs/FIREBASE_SETUP.md).
         </p>
       </main>
@@ -165,7 +165,7 @@ export default function AnalyticsPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Analytics</h1>
-        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
+        <p className="mt-4 text-sm text-slate-500">Loading…</p>
       </main>
     );
   }
@@ -173,7 +173,7 @@ export default function AnalyticsPage() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">Analytics</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 text-slate-400">
           Sign in with Google (top right) to see your stats.
         </p>
       </main>
@@ -189,7 +189,7 @@ export default function AnalyticsPage() {
   );
 
   const inputCls =
-    "mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-black dark:border-white/15 dark:bg-zinc-950 dark:text-zinc-100";
+    "input mt-1 w-full";
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-12">
@@ -198,12 +198,12 @@ export default function AnalyticsPage() {
         <button
           onClick={sync}
           disabled={status === "syncing"}
-          className="flex h-10 items-center rounded-full bg-red-700 px-5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
+          className="btn-primary-lg flex h-10 items-center"
         >
           {status === "syncing" ? "Syncing…" : "Sync Dev.to stats"}
         </button>
       </div>
-      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mt-2 text-sm text-slate-400">
         Dev.to syncs automatically via API. LinkedIn / X / Medium have no
         personal analytics API — enter numbers by hand from each platform.
         Totals: <strong>{totals.views.toLocaleString()} views</strong>,{" "}
@@ -212,7 +212,7 @@ export default function AnalyticsPage() {
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       {syncInfo && <p className="mt-3 text-sm text-green-600">{syncInfo}</p>}
 
-      <form onSubmit={logPublish} className="mt-6 rounded-2xl border border-black/10 p-5 dark:border-white/10">
+      <form onSubmit={logPublish} className="ui-panel mt-6 p-5">
         <h2 className="text-base font-semibold">Log a publish</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_140px]">
           <label className="block text-sm font-medium">
@@ -250,7 +250,7 @@ export default function AnalyticsPage() {
         </label>
         <button
           type="submit"
-          className="mt-3 flex h-10 items-center rounded-full bg-red-700 px-5 text-sm font-medium text-white hover:bg-red-800"
+          className="btn-primary-lg mt-3 flex h-10 items-center"
         >
           Log it
         </button>
@@ -260,32 +260,32 @@ export default function AnalyticsPage() {
         {rows.map((r) => (
           <li
             key={r.id}
-            className="rounded-2xl border border-black/10 bg-white p-4 dark:border-white/10 dark:bg-zinc-950"
+            className="ui-panel p-4"
           >
             <div className="flex items-center gap-2 text-xs">
-              <span className="rounded-full bg-black/5 px-2 py-0.5 font-mono uppercase dark:bg-white/10">
+              <span className="meta-pill uppercase">
                 {r.platform}
               </span>
-              <span className="text-zinc-500">{r.publishedAt.slice(0, 10)}</span>
+              <span className="text-slate-500">{r.publishedAt.slice(0, 10)}</span>
             </div>
             {r.url ? (
               <a
                 href={r.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1 block font-medium text-slate-800 hover:underline dark:text-slate-100"
+                className="mt-1 block font-medium text-slate-100 hover:underline"
               >
                 {r.title}
               </a>
             ) : (
-              <p className="mt-1 font-medium text-slate-800 dark:text-slate-100">{r.title}</p>
+              <p className="mt-1 font-medium text-slate-100">{r.title}</p>
             )}
             {r.platform === "devto" ? (
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="mt-1 text-sm text-slate-400">
                 {r.views ?? 0} views · {r.reactions ?? 0} reactions ·{" "}
                 {r.comments ?? 0} comments
                 {r.syncedAt && (
-                  <span className="text-xs text-zinc-500"> · synced {r.syncedAt.slice(0, 10)}</span>
+                  <span className="text-xs text-slate-500"> · synced {r.syncedAt.slice(0, 10)}</span>
                 )}
               </p>
             ) : (
@@ -297,7 +297,7 @@ export default function AnalyticsPage() {
                   onChange={(e) =>
                     setEdits((m) => ({ ...m, [r.id]: { ...m[r.id], views: e.target.value } }))
                   }
-                  className="w-24 rounded-lg border border-black/10 bg-white px-2 py-1 text-sm text-black dark:border-white/15 dark:bg-zinc-950 dark:text-zinc-100"
+                  className="input w-24"
                 />
                 <input
                   inputMode="numeric"
@@ -306,11 +306,11 @@ export default function AnalyticsPage() {
                   onChange={(e) =>
                     setEdits((m) => ({ ...m, [r.id]: { ...m[r.id], likes: e.target.value } }))
                   }
-                  className="w-24 rounded-lg border border-black/10 bg-white px-2 py-1 text-sm text-black dark:border-white/15 dark:bg-zinc-950 dark:text-zinc-100"
+                  className="input w-24"
                 />
                 <button
                   onClick={() => saveManual(r.id)}
-                  className="rounded-full border border-black/10 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-black/5 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10"
+                  className="btn-ghost"
                 >
                   Save
                 </button>
@@ -320,7 +320,7 @@ export default function AnalyticsPage() {
         ))}
       </ul>
       {status === "idle" && !rows.length && (
-        <p className="mt-6 text-sm text-zinc-500">
+        <p className="mt-6 text-sm text-slate-500">
           Nothing logged yet — or publish from{" "}
           <Link href="/drafts" className="underline">
             drafts

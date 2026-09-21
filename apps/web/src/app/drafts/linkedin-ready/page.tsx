@@ -141,7 +141,7 @@ function LinkedInReadyContent() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">LinkedIn Ready</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">Configure Firebase first.</p>
+        <p className="mt-4 text-slate-400">Configure Firebase first.</p>
       </main>
     );
   }
@@ -150,7 +150,7 @@ function LinkedInReadyContent() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">LinkedIn Ready</h1>
-        <p className="mt-4 text-sm text-zinc-500">Loading…</p>
+        <p className="mt-4 text-sm text-slate-500">Loading…</p>
       </main>
     );
   }
@@ -158,7 +158,7 @@ function LinkedInReadyContent() {
     return (
       <main className="mx-auto w-full max-w-3xl px-6 py-16">
         <h1 className="text-2xl font-semibold">LinkedIn Ready</h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 text-slate-400">
           Sign in with Google to view your LinkedIn Ready posts.
         </p>
       </main>
@@ -173,12 +173,12 @@ function LinkedInReadyContent() {
             <span className="rounded-full bg-sky-500/20 px-3 py-1 font-mono text-xs font-semibold text-sky-400 uppercase">
               LinkedIn Ready
             </span>
-            <span className="text-xs text-zinc-500">3,000 Char Limit Enforced</span>
+            <span className="text-xs text-slate-500">3,000 Char Limit Enforced</span>
           </div>
           <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
             Copy-Paste LinkedIn Post
           </h1>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-1 text-sm text-slate-400">
             Formatted with hooks, clean line breaks, bullet points, and hashtags. Ready to publish.
           </p>
         </div>
@@ -191,18 +191,18 @@ function LinkedInReadyContent() {
         </Link>
       </div>
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
 
       {/* Select Draft Picker */}
       {drafts.length > 1 && (
         <div className="mt-6 flex items-center gap-3">
-          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+          <label className="text-xs font-medium text-slate-400">
             Select Article Draft:
           </label>
           <select
             value={selectedId || ""}
             onChange={(e) => handleSelectDraft(e.target.value)}
-            className="rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs text-black dark:border-white/15 dark:bg-zinc-900 dark:text-zinc-100"
+            className="input w-auto text-xs"
           >
             {drafts.map((d) => (
               <option key={d.id} value={d.id}>
@@ -216,9 +216,9 @@ function LinkedInReadyContent() {
       {currentDraft ? (
         <div className="mt-6 flex flex-col gap-6">
           {/* Main Post Card */}
-          <div className="rounded-2xl border border-sky-500/20 bg-white p-6 shadow-xl dark:border-sky-500/30 dark:bg-zinc-950">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 pb-4 dark:border-white/10">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          <div className="ui-panel p-6 shadow-xl">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-4">
+              <h2 className="text-lg font-semibold text-slate-100">
                 {currentDraft.title}
               </h2>
 
@@ -227,7 +227,7 @@ function LinkedInReadyContent() {
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-mono font-semibold ${
                   isOverLimit
                     ? "bg-red-500/20 text-red-500 border border-red-500/30"
-                    : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                    : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                 }`}
               >
                 <span>{charCount.toLocaleString()} / 3,000 chars</span>
@@ -243,7 +243,7 @@ function LinkedInReadyContent() {
                 onChange={(e) => setEditedLinkedin(e.target.value)}
                 onBlur={saveEdits}
                 placeholder="LinkedIn ready text will appear here..."
-                className="w-full rounded-xl border border-black/10 bg-black/5 p-4 text-sm font-sans whitespace-pre-wrap text-slate-800 leading-relaxed dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+                className="input w-full p-4 font-sans text-sm leading-relaxed whitespace-pre-wrap"
               />
             </div>
 
@@ -262,7 +262,7 @@ function LinkedInReadyContent() {
                   href="https://www.linkedin.com/feed/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 rounded-full bg-slate-900 px-6 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                  className="flex items-center gap-2 rounded-full bg-slate-800 px-6 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-slate-700"
                 >
                   🚀 Open LinkedIn to Post ↗
                 </a>
@@ -279,7 +279,7 @@ function LinkedInReadyContent() {
           </div>
         </div>
       ) : (
-        <div className="mt-12 text-center text-sm text-zinc-500">
+        <div className="mt-12 text-center text-sm text-slate-500">
           No active drafts found. Approve an idea and create a draft first.
         </div>
       )}
