@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 import type { RawItem } from "@/lib/ingest/types";
 import { fetchDevtoByTags } from "@/lib/ingest/devto";
+import { isSafeHttpUrl } from "@/lib/ssrf";
 import {
   searchGithub,
   searchHn,
@@ -15,11 +16,11 @@ async function searchMedium(topics: string[]): Promise<RawItem[]> {
   const out: RawItem[] = [];
   for (const topic of topics) {
     const slug = topic.trim().toLowerCase().replace(/\s+/g, "-");
-    if (!slug) continue;
+    if (!slug || !/^[a-z0-9-]{1,80}$/.test(slug)) continue;
+    const feedUrl = `https://medium.com/feed/tag/${encodeURIComponent(slug)}`;
+    if (!isSafeHttpUrl(feedUrl)) continue;
     try {
-      const feed = await parser.parseURL(
-        `https://medium.com/feed/tag/${encodeURIComponent(slug)}`
-      );
+      const feed = await parser.parseURL(feedUrl);
       for (const i of feed.items ?? []) {
         if (!i.title || !i.link) continue;
         out.push({

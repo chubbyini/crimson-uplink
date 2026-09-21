@@ -1,4 +1,5 @@
 import type { RawItem } from "./types";
+import { assertSafeHostname, safeFetch } from "@/lib/ssrf";
 
 interface MastoStatus {
   id: string;
@@ -37,18 +38,25 @@ export async function fetchMastodonAccounts(
       const at = clean.lastIndexOf("@");
       if (at <= 0) continue;
       const user = clean.slice(0, at);
-      const instance = clean.slice(at + 1);
-      if (!user || !instance) continue;
+      const instanceRaw = clean.slice(at + 1);
+      if (!user || !instanceRaw) continue;
+      let instance: string;
+      try {
+        instance = assertSafeHostname(instanceRaw);
+      } catch {
+        continue;
+      }
+      if (!/^[A-Za-z0-9._-]{1,64}$/.test(user)) continue;
 
-      const lookup = await fetch(
+      const lookup = await safeFetch(
         `https://${instance}/api/v1/accounts/lookup?acct=${encodeURIComponent(user)}`
       );
       if (!lookup.ok) continue;
       const account = (await lookup.json()) as { id?: string };
       if (!account.id) continue;
 
-      const res = await fetch(
-        `https://${instance}/api/v1/accounts/${account.id}/statuses?limit=${perAccount}&exclude_replies=true`
+      const res = await safeFetch(
+        `https://${instance}/api/v1/accounts/${encodeURIComponent(account.id)}/statuses?limit=${perAccount}&exclude_replies=true`
       );
       if (!res.ok) continue;
       const statuses = (await res.json()) as MastoStatus[];

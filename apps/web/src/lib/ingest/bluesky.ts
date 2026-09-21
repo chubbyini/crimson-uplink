@@ -1,10 +1,11 @@
 import type { RawItem } from "./types";
+import { safeFetch } from "@/lib/ssrf";
 
 async function resolveHandle(handle: string): Promise<string | null> {
   const h = handle.replace(/^@/, "").trim();
-  if (!h) return null;
+  if (!h || !/^[A-Za-z0-9._:-]{1,128}$/.test(h)) return null;
   try {
-    const res = await fetch(
+    const res = await safeFetch(
       `https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(h)}`
     );
     if (!res.ok) return null;
@@ -35,8 +36,8 @@ export async function fetchBlueskyAccounts(
   for (const handle of handles) {
     try {
       const did = await resolveHandle(handle);
-      if (!did) continue;
-      const res = await fetch(
+      if (!did || !/^did:[A-Za-z0-9:._-]{1,128}$/.test(did)) continue;
+      const res = await safeFetch(
         `https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(did)}&limit=${perAccount}`
       );
       if (!res.ok) continue;

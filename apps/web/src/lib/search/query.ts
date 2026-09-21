@@ -1,8 +1,9 @@
 import type { RawItem } from "@/lib/ingest/types";
+import { safeFetch } from "@/lib/ssrf";
 
 /** Full-text story search on HN Algolia (up to 50 hits). */
 export async function searchHn(topic: string, perTopic = 25): Promise<RawItem[]> {
-  const res = await fetch(
+  const res = await safeFetch(
     `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(topic)}&tags=story&hitsPerPage=50`
   );
   if (!res.ok) return [];
@@ -35,7 +36,7 @@ export async function searchGithub(
   token?: string,
   perTopic = 25
 ): Promise<RawItem[]> {
-  const res = await fetch(
+  const res = await safeFetch(
     `https://api.github.com/search/repositories?q=${encodeURIComponent(topic)}&sort=stars&order=desc&per_page=${perTopic}`,
     {
       headers: {
@@ -74,7 +75,7 @@ export async function searchLobsters(topic: string): Promise<RawItem[]> {
     .split(/\s+/)
     .filter((w) => w.length > 2);
   if (!words.length) return [];
-  const res = await fetch("https://lobste.rs/hottest.json");
+  const res = await safeFetch("https://lobste.rs/hottest.json");
   if (!res.ok) return [];
   const stories = (await res.json()) as Array<{
     short_id?: string;
@@ -110,7 +111,7 @@ export async function searchStackOverflow(
   topic: string,
   perTopic = 25
 ): Promise<RawItem[]> {
-  const res = await fetch(
+  const res = await safeFetch(
     `https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=votes&q=${encodeURIComponent(topic)}&site=stackoverflow&pagesize=${perTopic}&filter=!nNPvSNd7bg`
   );
   if (!res.ok) return [];
