@@ -1,0 +1,63 @@
+import { NextResponse } from "next/server";
+import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
+
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+/**
+ * GET /api/pair — list recent pair sessions (summaries, no full history).
+ */
+export async function GET(req: Request) {
+  if (!isAdminConfigured) {
+    return NextResponse.json({ error: "Server not configured" }, { status: 503 });
+  }
+  const token = req.headers.get("authorization")?.replace(/^Bearer /i, "");
+  if (!token) return NextResponse.json({ error: "Missing ID token" }, { status: 401 });
+
+  let uid: string;
+  try {
+    uid = await verifyFirebaseToken(token);
+  } catch (e) {
+    const reason = e instanceof Error ? e.message.split("\n")[0] : "Invalid ID token";
+    return NextResponse.json({ error: `Invalid ID token (${reason})` }, { status: 401 });
+  }
+
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  if (id) {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
+      return NextResponse.json({ error: "Invalid session id" }, { status: 400 });
+    }
+    const snap = await adminDb().doc(`users/${uid}/pair-sessions/${id}`).get();
+    if (!snap.exists) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    return NextResponse.json({ id: snap.id, ...snap.data() });
+  }
+
+  const snap = await adminDb()
+    .collection(`users/${uid}/pair-sessions`)
+    .orderBy("updatedAt", "desc")
+    .limit(20)
+    .get();
+
+  const sessions = snap.docs.map((d) => {
+    const v = d.data() as {
+      title?: string;
+      mode?: string;
+      phase?: string;
+      status?: string;
+      updatedAt?: string;
+      articles?: Array<{ title?: string; status?: string }>;
+    };
+    return {
+      id: d.id,
+      title: v.title ?? "(untitled)",
+      mode: v.mode ?? "series",
+      phase: v.phase ?? "plan",
+      status: v.status ?? "open",
+      updatedAt: v.updatedAt ?? "",
+      articleCount: v.articles?.length ?? 0,
+    };
+  });
+  return NextResponse.json({ sessions });
+}

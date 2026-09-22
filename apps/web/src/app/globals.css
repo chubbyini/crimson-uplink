@@ -238,3 +238,175 @@ body {
   border-bottom: 2px solid #ff2a55;
   border-right: 2px solid #ff2a55;
 }
+
+/* Carmine mech cycler tabs (Pair Writer article ring) */
+.mech-cycler {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.mech-track {
+  display: flex;
+  align-items: stretch;
+  gap: 0.6rem;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0.5rem 0.25rem;
+  scrollbar-width: none;
+}
+.mech-track::-webkit-scrollbar {
+  display: none;
+}
+
+.mech-fade-x {
+  mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
+}
+
+.mech-plate {
+  position: relative;
+  flex: 0 0 auto;
+  width: 11rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  color: #cbd5e1;
+  background: linear-gradient(160deg, rgba(30, 10, 18, 0.9), rgba(2, 6, 23, 0.9));
+  border: 1px solid rgba(255, 42, 85, 0.25);
+  clip-path: polygon(0.65rem 0, 100% 0, 100% calc(100% - 0.65rem), calc(100% - 0.65rem) 100%, 0 100%, 0 0.65rem);
+  opacity: 0.6;
+  transform: scale(0.94);
+  transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  overflow: hidden;
+}
+.mech-plate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(255, 255, 255, 0.015) 2px 3px);
+}
+.mech-plate:hover {
+  opacity: 0.9;
+}
+.mech-plate:focus-visible {
+  outline: 2px solid #ff2a55;
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+.mech-plate-active {
+  opacity: 1;
+  transform: scale(1.05);
+  border-color: rgba(255, 42, 85, 0.9);
+  box-shadow: 0 0 24px rgba(255, 0, 60, 0.35), inset 0 0 18px rgba(255, 42, 85, 0.08);
+  color: #f1f5f9;
+  z-index: 1;
+}
+.mech-plate-active::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent 30%, rgba(255, 42, 85, 0.12) 50%, transparent 70%);
+  animation: mech-scan 5s linear infinite;
+}
+
+.mech-plate-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mech-lamp {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.mech-index {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: #ff8fa8;
+}
+
+.mech-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mech-plate-active .mech-title {
+  text-shadow: 0 0 10px rgba(255, 42, 85, 0.5);
+}
+
+.mech-sub {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.65rem;
+  color: #64748b;
+}
+
+.mech-chevron {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 2.25rem;
+  height: 3.5rem;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #ff8fa8;
+  background: linear-gradient(160deg, rgba(30, 10, 18, 0.9), rgba(2, 6, 23, 0.9));
+  border: 1px solid rgba(255, 42, 85, 0.4);
+  clip-path: polygon(0.5rem 0, 100% 0, 100% calc(100% - 0.5rem), calc(100% - 0.5rem) 100%, 0 100%, 0 0.5rem);
+}
+.mech-chevron:hover {
+  color: #fff;
+  border-color: #ff2a55;
+  box-shadow: 0 0 16px rgba(255, 0, 60, 0.35);
+}
+.mech-chevron:focus-visible {
+  outline: 2px solid #ff2a55;
+  outline-offset: 2px;
+}
+
+.mech-forge {
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  opacity: 0.75;
+  transform: scale(0.94);
+}
+.mech-forge-plus {
+  font-size: 1.5rem;
+  color: #ff2a55;
+  text-shadow: 0 0 12px rgba(255, 0, 60, 0.6);
+}
+
+@keyframes mech-scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mech-plate,
+  .mech-chevron {
+    transition: none;
+  }
+  .mech-plate-active::before {
+    animation: none;
+  }
+  .mech-track {
+    scroll-behavior: auto;
+  }
+}

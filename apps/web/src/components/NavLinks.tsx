@@ -16,6 +16,7 @@ const links = [
   { href: "/ideas", label: "IDEAS" },
   { href: "/content", label: "CONTENT" },
   { href: "/drafts", label: "DRAFTS" },
+  { href: "/pair", label: "PAIR WRITER" },
   { href: "/drafts/linkedin-ready", label: "LINKEDIN READY" },
   { href: "/corpus", label: "VOICE CORPUS" },
   { href: "/analytics", label: "ANALYTICS" },
