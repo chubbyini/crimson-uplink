@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { type User } from "firebase/auth";
 import { useAuth } from "@/components/AuthProvider";
+import { useSojournerVeil } from "@/components/brand/NavigationVeil";
 
 /** Null while signed out (landing stays clean); user once authenticated. */
 function useSignedIn(): User | null {
@@ -24,6 +25,7 @@ const links = [
 ];
 
 function NavItems({ path, onNavigate }: { path: string | null; onNavigate?: () => void }) {
+  const veil = useSojournerVeil();
   return (
     <>
       {links.map((l) => {
@@ -32,7 +34,10 @@ function NavItems({ path, onNavigate }: { path: string | null; onNavigate?: () =
           <Link
             key={l.href}
             href={l.href}
-            onClick={onNavigate}
+            onClick={() => {
+              veil.show();
+              onNavigate?.();
+            }}
             aria-current={active ? "page" : undefined}
             className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 font-mono text-xs font-medium transition-colors ${
               active

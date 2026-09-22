@@ -239,6 +239,53 @@ body {
   border-right: 2px solid #ff2a55;
 }
 
+/* Sojourner Builds waymark token (mirrored in PORTABLE_CSS for reuse). */
+@keyframes sj-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes sj-spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@keyframes sj-wp {
+  0%, 100% {
+    opacity: 0.22;
+  }
+  12% {
+    opacity: 1;
+  }
+  32% {
+    opacity: 0.45;
+  }
+}
+@keyframes sj-breathe {
+  0%, 100% {
+    opacity: 0.82;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.sj-spin {
+  animation: sj-spin var(--sj-speed, 14s) linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.sj-spin-rev {
+  animation: sj-spin-rev 30s linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.sj-wp {
+  animation: sj-wp 3s ease-in-out infinite;
+}
+.sj-breathe {
+  animation: sj-breathe 5s ease-in-out infinite;
+}
+
 /* Pair Writer stage: horizon-glow + perspective grid floor (distinct from
    the global cyber grid). Content sits above via .pair-stage. */
 .pair-stage {
@@ -476,6 +523,12 @@ body {
     scroll-behavior: auto;
   }
   .pair-bg::before {
+    animation: none;
+  }
+  .sj-spin,
+  .sj-spin-rev,
+  .sj-wp,
+  .sj-breathe {
     animation: none;
   }
 }

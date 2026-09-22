@@ -5,6 +5,8 @@ import AuthButton from "@/components/AuthButton";
 import { AuthProvider } from "@/components/AuthProvider";
 import { ToastProvider } from "@/components/Toast";
 import { MobileMenu, Sidebar } from "@/components/NavLinks";
+import SiteFooter from "@/components/SiteFooter";
+import { SojournerVeilProvider } from "@/components/brand/NavigationVeil";
 import CrimsonVeins from "@/components/CrimsonVeins";
 import BackgroundWarship from "@/components/BackgroundWarship";
 import CrimsonLightningBackground from "@/components/CrimsonLightningBackground";
@@ -77,22 +79,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
+        <SojournerVeilProvider>
         <Sidebar />
 
-        {/* Main Content Area (clears the fixed sidebar on desktop) */}
-        <div className="relative z-10 flex-1 lg:pl-60">{children}</div>
-
-        {/* Tactical Footer */}
-        <footer className="relative z-10 border-t border-slate-800 bg-slate-950/90 py-6 px-6 text-center font-mono text-xs text-slate-500">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p>
-              CRIMSON UPLINK // PRECISION CONTENT AUTOMATION ENGINE
-            </p>
-            <p className="text-[11px] text-slate-600">
-              BYOK ARCHITECTURE • GROQ GPT-OSS 120B • GEMINI 3.5 FLASH LITE
-            </p>
-          </div>
-        </footer>
+        {/* Main Content Area (clears the fixed sidebar on desktop).
+            Footer lives inside the same offset container so the fixed
+            sidebar never slides over/under it. Hidden on /pair where the
+            fixed SessionDock owns the viewport bottom. */}
+        <div className="relative z-10 flex min-h-[calc(100vh-57px)] flex-1 flex-col lg:pl-60">
+          <div className="flex-1">{children}</div>
+          <SiteFooter />
+        </div>
+        </SojournerVeilProvider>
         </ToastProvider>
         </AuthProvider>
       </body>
