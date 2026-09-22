@@ -13,6 +13,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
+import { markdownToPlain } from "@/lib/plaintext";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { PageSkeleton } from "@/components/Skeletons";
@@ -188,6 +189,10 @@ export default function DraftsPage() {
     setCopied(id);
     toast.success("Copied to clipboard ✓");
     setTimeout(() => setCopied((c) => (c === id ? null : c)), 2000);
+  }
+
+  async function copyPlain(id: string, body: string) {
+    await copy(`${id}-plain`, markdownToPlain(body));
   }
 
   async function saveEdit(id: string) {
@@ -407,7 +412,14 @@ export default function DraftsPage() {
                 onClick={() => copy(d.id, d.body)}
                 className="btn-ghost"
               >
-                {copied === d.id ? "Copied ✓" : "Copy text"}
+                {copied === d.id ? "Copied ✓" : "Copy markdown"}
+              </button>
+              <button
+                onClick={() => copyPlain(d.id, d.body)}
+                className="btn-ghost"
+                title="Plain wording without markdown — easy paste into LinkedIn/docs"
+              >
+                {copied === `${d.id}-plain` ? "Copied ✓" : "Copy plain text"}
               </button>
               {(d.status === "pending_review" || d.status === "approved") && editing !== d.id && (
                 <button

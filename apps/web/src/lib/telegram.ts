@@ -1,4 +1,5 @@
-import { Bot } from "grammy";
+import { Bot, InputFile } from "grammy";
+import { chunkText, markdownToPlain } from "./plaintext";
 
 export interface DigestIdea {
   id: string;
@@ -14,6 +15,41 @@ const esc = (s: string) =>
 
 const trunc = (s: string, n: number) =>
   s.length > n ? s.slice(0, n - 1) + "…" : s;
+
+/**
+ * Send a long plain-text body chunked into Telegram-safe messages.
+ * Plain (no parse_mode) so it copy-pastes cleanly and never breaks on
+ * markdown/HTML entities in the draft.
+ */
+async function sendFullText(
+  b: Bot,
+  chatId: string | number,
+  header: string,
+  body: string
+) {
+  const chunks = chunkText(body);
+  if (!chunks.length) {
+    await b.api.sendMessage(String(chatId), header);
+    return;
+  }
+  const total = chunks.length;
+  for (let i = 0; i < total; i++) {
+    const prefix = total > 1 ? `${header}\n(part ${i + 1}/${total})\n\n` : `${header}\n\n`;
+    await b.api.sendMessage(String(chatId), `${prefix}${chunks[i]}`);
+  }
+}
+
+/** Send a copy-ready .txt file so the user can open/copy in one tap. */
+async function sendCopyFile(
+  b: Bot,
+  chatId: string | number,
+  filename: string,
+  text: string,
+  caption: string
+) {
+  const file = new InputFile(Buffer.from(text, "utf8"), filename);
+  await b.api.sendDocument(String(chatId), file, { caption });
+}
 
 let bot: Bot | null | undefined;
 
@@ -69,7 +105,7 @@ export async function sendDigest(
   });
 }
 
-/** Render and send an interactive Draft review card with Publish/Edit/Reject inline buttons. */
+/** Render and send the FULL article draft (plain wording) + control card with Publish/Edit/Reject/Copy buttons. */
 export async function sendDraftCard(
   chatId: string | number,
   uid: string,
@@ -80,22 +116,28 @@ export async function sendDraftCard(
   const b = getBot();
   if (!b) return;
 
-  const wordCount = draft.body.split(/\s+/).filter(Boolean).length;
-  const preview = trunc(
-    draft.body
-      .replace(/#+\s+/g, "")
-      .replace(/[*`_~>]/g, "")
-      .trim(),
-    350
+  const plain = markdownToPlain(draft.body);
+  const wordCount = plain.split(/\s+/).filter(Boolean).length;
+  const hasLi = Boolean(draft.linkedinBody);
+  const title = draft.title.trim() || "(untitled)";
+
+  if (note) {
+    await b.api.sendMessage(String(chatId), note, { parse_mode: "HTML" });
+  }
+
+  // 1. Full copy-friendly article text (normal wording, no markdown).
+  await sendFullText(
+    b,
+    chatId,
+    `📝 FULL ARTICLE DRAFT — ${title} (${wordCount} words)`,
+    `${title}\n\n${plain}`
   );
 
-  const hasLi = Boolean(draft.linkedinBody);
+  // 2. Control card with approval + copy actions.
   const text =
-    (note ? `${note}\n\n` : "") +
-    `📝 <b>Article Draft Ready: ${esc(trunc(draft.title, 80))}</b>\n` +
+    `📝 <b>Review: ${esc(trunc(title, 80))}</b>\n` +
     `<i>${wordCount} words · ${esc(draft.model || "Groq")}${hasLi ? " · 💼 LinkedIn post ready" : ""}</i>\n\n` +
-    `<blockquote>${esc(preview)}</blockquote>\n\n` +
-    `Review the refined LinkedIn post, publish to Dev.to, or edit with AI:`;
+    `Full text is above ☝️ — read it, then approve, edit, or grab the copy-ready version:`;
 
   await b.api.sendMessage(String(chatId), text, {
     parse_mode: "HTML",
@@ -110,12 +152,15 @@ export async function sendDraftCard(
           { text: "✏️ Edit Article with AI", callback_data: `de:${uid}:${draftId}` },
           { text: "❌ Reject", callback_data: `dr:${uid}:${draftId}` },
         ],
+        [
+          { text: "📋 Copy-ready text", callback_data: `ca:${uid}:${draftId}` },
+        ],
       ],
     },
   });
 }
 
-/** Render and send an interactive LinkedIn review card with Approve & Post / Edit / Back inline buttons. */
+/** Render and send the FULL LinkedIn post (plain wording) + Approve & Post / Edit / Copy buttons. */
 export async function sendLinkedinCard(
   chatId: string | number,
   uid: string,
@@ -127,16 +172,28 @@ export async function sendLinkedinCard(
   const b = getBot();
   if (!b) return;
 
-  const charCount = linkedinBody.length;
-  const preview = trunc(linkedinBody.trim(), 700);
+  const full = linkedinBody.trim();
+  const charCount = full.length;
+  const cleanTitle = title.trim() || "(untitled)";
 
+  if (note) {
+    await b.api.sendMessage(String(chatId), note, { parse_mode: "HTML" });
+  }
+
+  // 1. Full copy-friendly LinkedIn text (already plain wording).
+  await sendFullText(
+    b,
+    chatId,
+    `💼 FULL LINKEDIN POST — ${cleanTitle} (${charCount} / 3,000 characters)`,
+    full
+  );
+
+  // 2. Control card with approval + copy actions.
   const text =
-    (note ? `${note}\n\n` : "") +
-    `💼 <b>LinkedIn Refined Post Preview</b>\n` +
-    `<b>${esc(trunc(title, 80))}</b>\n` +
+    `💼 <b>LinkedIn review: ${esc(trunc(cleanTitle, 80))}</b>\n` +
     `<i>Length: ${charCount} / 3,000 characters</i>\n\n` +
-    `<blockquote>${esc(preview)}</blockquote>\n\n` +
-    `⚠️ <b>Approval Required:</b> Tap <b>Approve & Post</b> below to publish live to LinkedIn, or refine with AI:`;
+    `Full post is above ☝️ — read it, then approve & post, refine, or grab the copy-ready version:\n\n` +
+    `⚠️ <b>Approval Required:</b> Tap <b>Approve & Post</b> below to publish live to LinkedIn.`;
 
   await b.api.sendMessage(String(chatId), text, {
     parse_mode: "HTML",
@@ -149,6 +206,9 @@ export async function sendLinkedinCard(
         [
           { text: "✏️ Refine LinkedIn with AI", callback_data: `le:${uid}:${draftId}` },
           { text: "🔙 View Full Article", callback_data: `da:${uid}:${draftId}` },
+        ],
+        [
+          { text: "📋 Copy LinkedIn text", callback_data: `cl:${uid}:${draftId}` },
         ],
       ],
     },
@@ -167,6 +227,8 @@ export async function sendLinkedinCard(
  * - de: Draft Edit -> sets active editing target to "article" for user DM prompt
  * - da: Draft Article -> switches view back to full article card
  * - dr: Draft Reject -> marks draft rejected
+ * - ca: Copy Article -> sends the full plain-wording article + .txt file for easy copy-paste
+ * - cl: Copy LinkedIn -> sends the full LinkedIn post + .txt file for easy copy-paste
  */
 export async function handleCallback(
   callbackId: string,
@@ -338,8 +400,45 @@ export async function handleCallback(
     return "view-article";
   }
 
+  if (actionCode === "ca") {
+    await b.api.answerCallbackQuery(callbackId, { text: "Sending copy-ready text…" });
+    const draftSnap = await db.doc(`users/${uid}/drafts/${safeId}`).get();
+    if (!draftSnap.exists) {
+      await b.api.sendMessage(String(fromChatId), "Draft not found.", { parse_mode: "HTML" });
+      return "gone";
+    }
+    const draft = draftSnap.data() as { title: string; body: string };
+    const plain = markdownToPlain(draft.body);
+    const full = `${(draft.title || "").trim()}\n\n${plain}`.trim();
+    await sendFullText(b, fromChatId, "📋 COPY-READY ARTICLE (plain wording — long-press to copy)", full);
+    try {
+      await sendCopyFile(b, fromChatId, `article-${safeId}.txt`, full, "📋 Same article as a .txt file — open & copy in one tap.");
+    } catch (e) {
+      console.warn("send article copy file failed:", e);
+    }
+    return "copy-article";
+  }
+
+  if (actionCode === "cl") {
+    await b.api.answerCallbackQuery(callbackId, { text: "Sending copy-ready LinkedIn text…" });
+    const draftSnap = await db.doc(`users/${uid}/drafts/${safeId}`).get();
+    if (!draftSnap.exists) {
+      await b.api.sendMessage(String(fromChatId), "Draft not found.", { parse_mode: "HTML" });
+      return "gone";
+    }
+    const draft = draftSnap.data() as { title: string; body: string; linkedinBody?: string };
+    const full = (draft.linkedinBody || markdownToPlain(draft.body)).trim();
+    await sendFullText(b, fromChatId, "📋 COPY-READY LINKEDIN POST (plain wording — long-press to copy)", full);
+    try {
+      await sendCopyFile(b, fromChatId, `linkedin-${safeId}.txt`, full, "📋 Same LinkedIn post as a .txt file — open & copy in one tap.");
+    } catch (e) {
+      console.warn("send linkedin copy file failed:", e);
+    }
+    return "copy-linkedin";
+  }
+
   if (actionCode === "dl") {
-    await b.api.answerCallbackQuery(callbackId, { text: "Loading LinkedIn preview" });
+    await b.api.answerCallbackQuery(callbackId, { text: "Loading full LinkedIn post" });
     const draftSnap = await db.doc(`users/${uid}/drafts/${safeId}`).get();
     if (!draftSnap.exists) {
       await b.api.sendMessage(String(fromChatId), "Draft not found.", { parse_mode: "HTML" });
@@ -622,8 +721,10 @@ const HELP =
   "• <code>/topics ai, rust, GPUs</code> — research topics & score ideas.\n" +
   "• Morning digests arrive daily at 06:00 UTC.\n" +
   "• Tap <b>✅</b> on an idea to auto-draft article + LinkedIn post.\n" +
+  "• Full draft text (plain wording, no markdown) arrives in Telegram so you can read & approve.\n" +
   "• Tap <b>💼 Review LinkedIn Post</b> to approve or refine before posting.\n" +
   "• Tap <b>📰 Publish to Dev.to</b> to publish live directly.\n" +
+  "• Tap <b>📋 Copy-ready text</b> to get a plain-wording version + .txt file for easy copy-paste.\n" +
   "• Type <code>/cancel</code> anytime to abort an active edit session.";
 
 /**
