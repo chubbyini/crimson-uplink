@@ -9,6 +9,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { PageSkeleton } from "@/components/Skeletons";
 import MechCycleTabs from "@/components/pair/MechCycleTabs";
+import SessionDock from "@/components/pair/SessionDock";
 
 interface PairTurn {
   role: "user" | "assistant";
@@ -59,6 +60,9 @@ export default function PairPage() {
   const toast = useToast();
   const router = useRouter();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMoreSessions, setHasMoreSessions] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [session, setSession] = useState<PairSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -74,6 +78,10 @@ export default function PairPage() {
   const [drawer, setDrawer] = useState<null | "idea" | "draft">(null);
   const [drawerItems, setDrawerItems] = useState<Array<{ id: string; title: string; sub: string }>>([]);
   const [drawerLoading, setDrawerLoading] = useState(false);
+  const [pickCache, setPickCache] = useState<{
+    ideas: Array<{ id: string; title: string; sub: string }>;
+    drafts: Array<{ id: string; title: string; sub: string }>;
+  } | null>(null);
   const [newArticleTitle, setNewArticleTitle] = useState<string | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
 
@@ -94,12 +102,32 @@ export default function PairPage() {
 
   const loadSessions = useCallback(async () => {
     try {
-      const data = await authed("/api/pair");
+      const data = await authed("/api/pair?limit=20");
       setSessions(data.sessions ?? []);
+      setNextCursor(data.nextCursor ?? null);
+      setHasMoreSessions(Boolean(data.nextCursor));
     } catch {
       // List is best-effort; an open session still works.
     }
   }, [authed]);
+
+  const loadMoreSessions = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await authed(`/api/pair?limit=20&cursor=${encodeURIComponent(nextCursor)}`);
+      setSessions((prev) => {
+        const seen = new Set(prev.map((s) => s.id));
+        return [...prev, ...(data.sessions ?? []).filter((s: SessionSummary) => !seen.has(s.id))];
+      });
+      setNextCursor(data.nextCursor ?? null);
+      setHasMoreSessions(Boolean(data.nextCursor));
+    } catch {
+      // Infinite scroll is best-effort.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [authed, nextCursor, loadingMore]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -226,27 +254,62 @@ export default function PairPage() {
     }
   }
 
+  async function loadPickLists() {
+    if (!user || !db) return null;
+    const [ideasSnap, draftsSnap] = await Promise.all([
+      getDocs(query(collection(db, "users", user.uid, "ideas"), orderBy("createdAt", "desc"), limit(30))),
+      getDocs(query(collection(db, "users", user.uid, "drafts"), orderBy("createdAt", "desc"), limit(30))),
+    ]);
+    const lists = {
+      ideas: ideasSnap.docs.map((d) => {
+        const v = d.data() as { title?: string; angle?: string; status?: string };
+        return { id: d.id, title: v.title ?? "(untitled)", sub: `${v.status ?? ""} · ${(v.angle ?? "").slice(0, 80)}` };
+      }),
+      drafts: draftsSnap.docs.map((d) => {
+        const v = d.data() as { title?: string; status?: string; format?: string };
+        return { id: d.id, title: v.title ?? "(untitled)", sub: `${v.status ?? ""} · ${v.format ?? ""}` };
+      }),
+    };
+    setPickCache(lists);
+    return lists;
+  }
+
+  // Preload picker lists while the launcher is visible so the drawer opens instantly.
+  useEffect(() => {
+    if (!showLauncher || pickCache) return;
+    // Prefetch-on-view: not render-derived state, safe to kick off here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadPickLists().catch(() => {});
+  }, [showLauncher, user]);
+
   async function openDrawer(kind: "idea" | "draft") {
     setDrawer(kind);
+    const cached = pickCache?.[kind === "idea" ? "ideas" : "drafts"];
+    if (cached) {
+      setDrawerItems(cached);
+      return;
+    }
     setDrawerItems([]);
     if (!user || !db) return;
     setDrawerLoading(true);
     try {
-      const snap = await getDocs(
-        query(collection(db, "users", user.uid, kind === "idea" ? "ideas" : "drafts"), orderBy("createdAt", "desc"), limit(30))
-      );
-      setDrawerItems(
-        snap.docs.map((d) => {
-          const v = d.data() as { title?: string; angle?: string; status?: string; format?: string };
-          return {
-            id: d.id,
-            title: v.title ?? "(untitled)",
-            sub: kind === "idea" ? `${v.status ?? ""} · ${(v.angle ?? "").slice(0, 80)}` : `${v.status ?? ""} · ${v.format ?? ""}`,
-          };
-        })
-      );
+      const lists = await loadPickLists();
+      setDrawerItems(lists?.[kind === "idea" ? "ideas" : "drafts"] ?? []);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to load list");
+    } finally {
+      setDrawerLoading(false);
+    }
+  }
+
+  async function refreshDrawer() {
+    if (!drawer) return;
+    setDrawerLoading(true);
+    try {
+      const lists = await loadPickLists();
+      setDrawerItems(lists?.[drawer === "idea" ? "ideas" : "drafts"] ?? []);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to reload list");
     } finally {
       setDrawerLoading(false);
     }
@@ -361,7 +424,7 @@ export default function PairPage() {
   const activeIdx = session ? session.articles.findIndex((a) => a.id === session.activeArticleId) : -1;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 py-12">
+    <main className="mx-auto w-full max-w-6xl px-6 pt-12 pb-48">
       <div className="flex flex-wrap items-center gap-3">
         <div>
           <h1 className="ui-title">Pair Writer</h1>
@@ -376,28 +439,8 @@ export default function PairPage() {
       </div>
       {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[16rem_1fr]">
-        {/* Session rail */}
-        <aside className="ui-panel h-fit p-3">
-          <h2 className="px-2 font-mono text-[10px] tracking-widest text-slate-500">SESSIONS</h2>
-          {sessions.length === 0 && (
-            <p className="px-2 py-2 text-xs text-slate-500">No sessions yet — launch one.</p>
-          )}
-          {sessions.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => openSession(s.id)}
-              className={`mt-1 block w-full rounded-lg px-2 py-2 text-left hover:bg-white/5 ${session?.id === s.id ? "bg-white/5" : ""}`}
-            >
-              <span className="block truncate text-sm text-slate-200">{s.title}</span>
-              <span className="mt-0.5 block font-mono text-[10px] text-slate-500">
-                {s.mode} · {s.phase} · {s.articleCount}a · {s.status}
-              </span>
-            </button>
-          ))}
-        </aside>
-
-        <section>
+      <div className="mt-6 min-w-0">
+        <section className="min-w-0">
           {(!session || showLauncher) && (
             <div className="ui-panel p-5">
               <h2 className="text-base font-semibold">Launch a session</h2>
@@ -489,7 +532,10 @@ export default function PairPage() {
                   <h2 className="text-base font-semibold">
                     Pick {drawer === "idea" ? "an idea" : "a draft"}
                   </h2>
-                  <button onClick={() => setDrawer(null)} className="btn-ghost ml-auto">Close</button>
+                  <button onClick={refreshDrawer} className="btn-ghost ml-auto" disabled={drawerLoading}>
+                    {drawerLoading ? "…" : "Reload"}
+                  </button>
+                  <button onClick={() => setDrawer(null)} className="btn-ghost">Close</button>
                 </div>
                 {drawerLoading && <p className="mt-4 text-sm text-slate-400">Loading…</p>}
                 <div className="mt-4 flex flex-1 flex-col gap-2 overflow-y-auto">
@@ -564,12 +610,12 @@ export default function PairPage() {
 
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
                 {/* Thread */}
-                <div className="ui-panel flex min-h-[24rem] flex-col p-4">
+                <div className="ui-panel flex min-h-[24rem] min-w-0 flex-col p-4">
                   <div ref={threadRef} className="flex max-h-[32rem] flex-1 flex-col gap-3 overflow-y-auto pr-1">
                     {session.history.map((t, i) => (
                       <div
                         key={i}
-                        className={`max-w-[90%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${
+                        className={`max-w-[90%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap [overflow-wrap:anywhere] ${
                           t.role === "user"
                             ? "self-end bg-red-700/80 text-white"
                             : "self-start border border-slate-800 bg-white/5 text-slate-200"
@@ -607,14 +653,14 @@ export default function PairPage() {
                 </div>
 
                 {/* Working copy */}
-                <div className="ui-panel flex min-h-[24rem] flex-col p-4">
+                <div className="ui-panel flex min-h-[24rem] min-w-0 flex-col p-4">
                   <div className="flex items-center gap-2">
                     <h3 className="truncate text-sm font-semibold text-slate-200">
                       {active ? `#${activeIdx + 1} ${active.title}` : "No article"}
                     </h3>
                     <span className="meta-pill ml-auto">{active?.status}</span>
                   </div>
-                  <pre className="mt-2 max-h-[32rem] flex-1 overflow-y-auto rounded-lg bg-black/30 p-3 font-mono text-xs whitespace-pre-wrap text-slate-300">
+                  <pre className="mt-2 max-h-[32rem] flex-1 overflow-y-auto rounded-lg bg-black/30 p-3 font-mono text-xs whitespace-pre-wrap text-slate-300 [overflow-wrap:anywhere]">
                     {active?.workingBody || "No working copy yet — plan first, then /rewrite."}
                   </pre>
                   <div className="mt-3 flex gap-2">
@@ -634,6 +680,16 @@ export default function PairPage() {
           )}
         </section>
       </div>
+
+      <SessionDock
+        sessions={sessions}
+        hasMore={hasMoreSessions}
+        loadingMore={loadingMore}
+        activeId={session?.id ?? null}
+        onOpen={openSession}
+        onNew={() => { setSession(null); setShowLauncher(true); }}
+        onLoadMore={loadMoreSessions}
+      />
     </main>
   );
 }

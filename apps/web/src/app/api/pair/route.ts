@@ -6,7 +6,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * GET /api/pair — list recent pair sessions (summaries, no full history).
+ * GET /api/pair — list pair sessions (summaries, no full history).
+ * Query: ?id=<sessionId> returns one full session.
+ * Query: ?cursor=<updatedAt ISO>&limit=<n> paginates (default 20, max 50).
  */
 export async function GET(req: Request) {
   if (!isAdminConfigured) {
@@ -34,11 +36,18 @@ export async function GET(req: Request) {
     return NextResponse.json({ id: snap.id, ...snap.data() });
   }
 
-  const snap = await adminDb()
-    .collection(`users/${uid}/pair-sessions`)
-    .orderBy("updatedAt", "desc")
-    .limit(20)
-    .get();
+  const rawLimit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
+  const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : 20, 1), 50);
+  const cursor = url.searchParams.get("cursor") || null;
+
+  const snap = await (() => {
+    let q = adminDb()
+      .collection(`users/${uid}/pair-sessions`)
+      .orderBy("updatedAt", "desc")
+      .limit(limit);
+    if (cursor) q = q.startAfter(cursor) as typeof q;
+    return q.get();
+  })();
 
   const sessions = snap.docs.map((d) => {
     const v = d.data() as {
@@ -59,5 +68,9 @@ export async function GET(req: Request) {
       articleCount: v.articles?.length ?? 0,
     };
   });
-  return NextResponse.json({ sessions });
+  const last = sessions[sessions.length - 1];
+  return NextResponse.json({
+    sessions,
+    nextCursor: snap.docs.length === limit && last ? last.updatedAt : null,
+  });
 }
