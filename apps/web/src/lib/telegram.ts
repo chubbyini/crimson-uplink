@@ -719,6 +719,7 @@ export async function handleCallback(
 const HELP =
   "<b>Crimson Uplink Bot</b>\n\n" +
   "• <code>/topics ai, rust, GPUs</code> — research topics & score ideas.\n" +
+  "• <code>/ingest</code> — fresh full run: pull sources, score ideas, send digest.\n" +
   "• Morning digests arrive daily at 06:00 UTC.\n" +
   "• Tap <b>✅</b> on an idea to auto-draft article + LinkedIn post.\n" +
   "• Full draft text (plain wording, no markdown) arrives in Telegram so you can read & approve.\n" +
@@ -731,7 +732,8 @@ const HELP =
  * Handle incoming DMs:
  * 1. If user is in an active draft edit session, treat message as AI prompt (article or LinkedIn).
  * 2. /topics runs the full research -> ideas -> digest flow.
- * 3. /cancel clears active edit state.
+ * 3. /ingest runs a fresh full run: ingest -> score ideas -> digest.
+ * 4. /cancel clears active edit state.
  */
 export async function handleIncomingMessage(
   chatId: number,
@@ -912,8 +914,56 @@ export async function handleIncomingMessage(
     }
   }
 
-  // Handle /topics or general commands
-  if (!text.trim().toLowerCase().startsWith("/topics")) {
+  // Handle /ingest (fresh full run) or /topics or general commands
+  const lower = text.trim().toLowerCase();
+  if (lower.startsWith("/ingest")) {
+    const { checkRateLimit } = await import("./rate-limit");
+    const rate = checkRateLimit(`tg-ingest:${chatId}`, 1, 5 * 60 * 1000);
+    if (!rate.success) {
+      await send("⏳ <b>/ingest</b> runs max once every 5 minutes — please wait a bit.", true);
+      return "rate-limited";
+    }
+
+    const { ingestForUser, loadSettings, scoreForUser } = await import("./pipeline");
+    const settings = await loadSettings(db, uid);
+    if (!settings) {
+      await send("Save your Settings in Crimson Uplink first.", false);
+      return "no-settings";
+    }
+
+    await send("🔄 <b>Running a fresh ingest…</b> pulling sources, may take up to a minute.", true);
+    try {
+      const ingest = await ingestForUser(db, uid, settings);
+      await send(
+        `📥 <b>Ingest done:</b> ${ingest.fetched} fetched · ${ingest.added} new · ${ingest.seenBefore} seen before. Scoring ideas with Gemini…`,
+        true
+      );
+    } catch (e) {
+      await send(
+        `Ingest failed: ${esc(e instanceof Error ? e.message.split("\n")[0] : "unknown")}`,
+        false
+      );
+      return "ingest-failed";
+    }
+
+    try {
+      const topics = [...(settings.devtoTags ?? []), ...(settings.npmPackages ?? [])].slice(0, 8);
+      const scored = await scoreForUser(db, uid, settings, topics.length ? topics : undefined);
+      if (!scored.telegram.sent && scored.telegram.reason) {
+        await send(`💡 Scored <b>${scored.count} ideas</b>, but digest send failed: ${esc(scored.telegram.reason)}`, true);
+        return "ingest-scored-no-digest";
+      }
+      return "ingested";
+    } catch (e) {
+      await send(
+        `Scoring failed: ${esc(e instanceof Error ? e.message.split("\n")[0] : "unknown")}`,
+        false
+      );
+      return "score-failed";
+    }
+  }
+
+  if (!lower.startsWith("/topics")) {
     await send(HELP);
     return "help";
   }
