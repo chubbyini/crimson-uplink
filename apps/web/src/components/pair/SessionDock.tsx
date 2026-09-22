@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
 export interface DockSession {
   id: string;
   title: string;
@@ -23,15 +21,32 @@ interface Props {
   onDelete: (id: string, title: string) => void;
 }
 
-const CARD_W = 232;
-const GAP = 12;
-const STRIDE = CARD_W + GAP;
-const OVERSCAN = 4;
+function TrashIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
 
 /**
- * Bottom-docked session rail: holds ALL user sessions via infinite scroll
- * (paginated fetch) + horizontal virtualization (only the visible window
- * of fixed-stride cards is mounted, flanked by spacers).
+ * Sessions list: normal in-flow section. The panel keeps a fixed size
+ * while the session cards scroll inside it; pagination is an explicit
+ * "Load more" button below the scroll area.
  */
 export default function SessionDock({
   sessions,
@@ -43,108 +58,74 @@ export default function SessionDock({
   onLoadMore,
   onDelete,
 }: Props) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef(new Map<string, HTMLButtonElement>());
-  const [range, setRange] = useState({ start: 0, end: 12 });
-  const raf = useRef(0);
-
-  const measure = () => {
-    const el = trackRef.current;
-    if (!el) return;
-    const visible = Math.ceil(el.clientWidth / STRIDE) + OVERSCAN * 2;
-    const start = Math.max(0, Math.floor(el.scrollLeft / STRIDE) - OVERSCAN);
-    setRange({ start, end: Math.min(sessions.length, start + visible) });
-    // Infinite scroll: prefetch before hitting the end.
-    if (hasMore && !loadingMore && el.scrollLeft + el.clientWidth > el.scrollWidth - STRIDE * 3) {
-      onLoadMore();
-    }
-  };
-
-  useEffect(() => {
-    measure();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions.length, hasMore, loadingMore]);
-
-  // Keep the active session card in view on selection.
-  useEffect(() => {
-    if (!activeId) return;
-    cardRefs.current.get(activeId)?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, [activeId]);
-
-  const onScroll = () => {
-    cancelAnimationFrame(raf.current);
-    raf.current = requestAnimationFrame(measure);
-  };
-
-  useEffect(() => () => cancelAnimationFrame(raf.current), []);
-
-  const { start, end } = range;
-  const leftPad = start * STRIDE;
-  const rightPad = Math.max(0, (sessions.length - end) * STRIDE - GAP);
-  const visible = sessions.slice(start, end);
-
   return (
-    <div className="fixed right-0 bottom-0 left-0 z-30 border-t border-slate-800 bg-slate-950/95 backdrop-blur-xl lg:left-60">
-      <div className="mx-auto flex w-full max-w-6xl items-stretch gap-3 px-6 py-3">
-        <div className="flex flex-col justify-center">
-          <span className="font-mono text-[10px] tracking-widest text-slate-500">SESSIONS</span>
-          <span className="font-mono text-[10px] text-slate-600">{sessions.length}{hasMore ? "+" : ""}</span>
-          <button onClick={onNew} className="btn-primary-sm mt-1 whitespace-nowrap">
-            + New
+    <section aria-label="All sessions" className="ui-panel mt-8 flex max-h-[26rem] flex-col p-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-100">Sessions</h2>
+          <p className="mt-0.5 font-mono text-[11px] text-slate-500">
+            {sessions.length}
+            {hasMore ? "+" : ""} total · newest first
+          </p>
+        </div>
+        <button onClick={onNew} className="btn-primary-sm ml-auto">
+          + New
+        </button>
+      </div>
+
+      {sessions.length === 0 && !loadingMore ? (
+        <p className="mt-4 text-sm text-slate-500">
+          No sessions yet — start one above.
+        </p>
+      ) : (
+        <ul className="mt-4 grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+          {sessions.map((s) => (
+            <li key={s.id} className="min-w-0">
+              <div
+                className={`group relative rounded-xl border transition-colors ${
+                  s.id === activeId
+                    ? "border-red-600 bg-red-950/40"
+                    : "border-slate-800 bg-white/[0.02] hover:bg-white/5"
+                }`}
+              >
+                <button
+                  onClick={() => onOpen(s.id)}
+                  aria-current={s.id === activeId ? "true" : undefined}
+                  className="block w-full p-3 pr-10 text-left"
+                >
+                  <span className="block truncate text-sm text-slate-200">{s.title}</span>
+                  <span className="mt-1 block font-mono text-[10px] text-slate-500">
+                    {s.mode} · {s.phase} · {s.articleCount}a · {s.status}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete session ${s.title}`}
+                  title="Delete session"
+                  onClick={() => onDelete(s.id, s.title)}
+                  className="absolute top-2 right-2 rounded-lg border border-transparent p-1.5 text-slate-600 opacity-0 transition-colors group-hover:opacity-100 hover:border-red-900 hover:text-red-400 focus-visible:opacity-100"
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {loadingMore && (
+        <p className="mt-3 text-center font-mono text-[11px] text-slate-500">
+          loading…
+        </p>
+      )}
+
+      {hasMore && (
+        <div className="mt-3 flex justify-center">
+          <button onClick={onLoadMore} disabled={loadingMore} className="btn-ghost">
+            {loadingMore ? "Loading…" : "Load more sessions"}
           </button>
         </div>
-        <div
-          ref={trackRef}
-          onScroll={onScroll}
-          className="flex min-w-0 flex-1 items-stretch gap-3 overflow-x-auto py-1"
-        >
-          {leftPad > 0 && <div style={{ flex: `0 0 ${leftPad}px` }} aria-hidden />}
-          {visible.map((s) => (
-            <button
-              key={s.id}
-              ref={(el) => {
-                if (el) cardRefs.current.set(s.id, el);
-                else cardRefs.current.delete(s.id);
-              }}
-              onClick={() => onOpen(s.id)}
-              style={{ flex: `0 0 ${CARD_W}px` }}
-              aria-current={s.id === activeId ? "true" : undefined}
-              className={`group relative rounded-xl border p-3 text-left transition-colors ${
-                s.id === activeId
-                  ? "border-red-600 bg-red-950/40"
-                  : "border-slate-800 bg-white/[0.02] hover:bg-white/5"
-              }`}
-            >
-              <span
-                role="button"
-                tabIndex={0}
-                aria-label={`Delete session ${s.title}`}
-                title="Delete session"
-                onClick={(e) => { e.stopPropagation(); onDelete(s.id, s.title); }}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onDelete(s.id, s.title); } }}
-                className="absolute top-1.5 right-1.5 rounded px-1 font-mono text-xs text-slate-600 opacity-0 group-hover:opacity-100 hover:text-red-400 focus-visible:opacity-100"
-              >
-                ×
-              </span>
-              <span className="block truncate text-sm text-slate-200">{s.title}</span>
-              <span className="mt-1 block font-mono text-[10px] text-slate-500">
-                {s.mode} · {s.phase} · {s.articleCount}a · {s.status}
-              </span>
-            </button>
-          ))}
-          {rightPad > 0 && <div style={{ flex: `0 0 ${rightPad}px` }} aria-hidden />}
-          {loadingMore && (
-            <div className="flex flex-none items-center px-2 font-mono text-[11px] text-slate-500">
-              loading…
-            </div>
-          )}
-          {!hasMore && sessions.length === 0 && !loadingMore && (
-            <div className="flex flex-none items-center px-2 text-xs text-slate-500">
-              No sessions yet — start one above.
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      )}
+    </section>
   );
 }

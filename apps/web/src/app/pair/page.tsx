@@ -89,6 +89,8 @@ export default function PairPage() {
     drafts: Array<{ id: string; title: string; sub: string }>;
   } | null>(null);
   const [newArticleTitle, setNewArticleTitle] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
 
   const authed = useCallback(
@@ -394,8 +396,14 @@ export default function PairPage() {
     }
   }
 
-  async function deleteSession(id: string, title: string) {
-    if (!window.confirm(`Delete session "${title}"? Shipped drafts are kept.`)) return;
+  function deleteSession(id: string, title: string) {
+    setPendingDelete({ id, title });
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete || deleting) return;
+    const { id } = pendingDelete;
+    setDeleting(true);
     setError(null);
     try {
       await authed("/api/pair", { method: "DELETE", body: JSON.stringify({ sessionId: id }) });
@@ -403,12 +411,15 @@ export default function PairPage() {
         setSession(null);
         setShowLauncher(true);
       }
+      setPendingDelete(null);
       await loadSessions();
       toast.success("Session deleted");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Delete failed";
       setError(msg);
       toast.error(msg);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -448,7 +459,7 @@ export default function PairPage() {
   const activeIdx = session ? session.articles.findIndex((a) => a.id === session.activeArticleId) : -1;
 
   return (
-    <main className="pair-stage mx-auto w-full max-w-6xl px-6 pt-12 pb-48">
+    <main className="pair-stage mx-auto w-full max-w-6xl px-6 pt-12 pb-16">
       <div className="pair-bg" aria-hidden />
       <div className="pair-content">
       <div className="flex flex-wrap items-center gap-3">
@@ -546,7 +557,7 @@ export default function PairPage() {
           )}
 
           {/* Picker drawer is rendered at the end of <main> (outside .pair-content)
-              so its z-50 overlay is never trapped under the dock. */}
+              so its z-50 overlay stays above page content. */}
 
           {session && !showLauncher && (
             <>
@@ -689,7 +700,57 @@ export default function PairPage() {
           )}
         </section>
       </div>
+
+      <SessionDock
+        sessions={sessions}
+        hasMore={hasMoreSessions}
+        loadingMore={loadingMore}
+        activeId={session?.id ?? null}
+        onOpen={openSession}
+        onNew={() => { setSession(null); setShowLauncher(true); }}
+        onLoadMore={loadMoreSessions}
+        onDelete={deleteSession}
+      />
       </div>
+
+      {pendingDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => !deleting && setPendingDelete(null)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="Delete session"
+            aria-describedby="delete-session-desc"
+            className="ui-panel w-full max-w-md p-5"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === "Escape" && !deleting) setPendingDelete(null); }}
+          >
+            <h2 className="text-base font-semibold text-slate-100">Delete session?</h2>
+            <p id="delete-session-desc" className="mt-2 text-sm text-slate-400">
+              Delete <span className="text-slate-200">“{pendingDelete.title}”</span>?
+              Shipped drafts are kept.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setPendingDelete(null)}
+                disabled={deleting}
+                className="btn-ghost"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="btn-primary"
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {drawer && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={() => setDrawer(null)}>
@@ -728,16 +789,6 @@ export default function PairPage() {
         </div>
       )}
 
-      <SessionDock
-        sessions={sessions}
-        hasMore={hasMoreSessions}
-        loadingMore={loadingMore}
-        activeId={session?.id ?? null}
-        onOpen={openSession}
-        onNew={() => { setSession(null); setShowLauncher(true); }}
-        onLoadMore={loadMoreSessions}
-        onDelete={deleteSession}
-      />
-    </main>
+      </main>
   );
 }
