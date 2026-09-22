@@ -20,6 +20,7 @@ interface Props {
   onOpen: (id: string) => void;
   onNew: () => void;
   onLoadMore: () => void;
+  onDelete: (id: string, title: string) => void;
 }
 
 const CARD_W = 232;
@@ -40,6 +41,7 @@ export default function SessionDock({
   onOpen,
   onNew,
   onLoadMore,
+  onDelete,
 }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -107,12 +109,23 @@ export default function SessionDock({
               onClick={() => onOpen(s.id)}
               style={{ flex: `0 0 ${CARD_W}px` }}
               aria-current={s.id === activeId ? "true" : undefined}
-              className={`rounded-xl border p-3 text-left transition-colors ${
+              className={`group relative rounded-xl border p-3 text-left transition-colors ${
                 s.id === activeId
                   ? "border-red-600 bg-red-950/40"
                   : "border-slate-800 bg-white/[0.02] hover:bg-white/5"
               }`}
             >
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label={`Delete session ${s.title}`}
+                title="Delete session"
+                onClick={(e) => { e.stopPropagation(); onDelete(s.id, s.title); }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onDelete(s.id, s.title); } }}
+                className="absolute top-1.5 right-1.5 rounded px-1 font-mono text-xs text-slate-600 opacity-0 group-hover:opacity-100 hover:text-red-400 focus-visible:opacity-100"
+              >
+                ×
+              </span>
               <span className="block truncate text-sm text-slate-200">{s.title}</span>
               <span className="mt-1 block font-mono text-[10px] text-slate-500">
                 {s.mode} · {s.phase} · {s.articleCount}a · {s.status}

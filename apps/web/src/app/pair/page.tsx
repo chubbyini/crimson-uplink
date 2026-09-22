@@ -394,6 +394,24 @@ export default function PairPage() {
     }
   }
 
+  async function deleteSession(id: string, title: string) {
+    if (!window.confirm(`Delete session "${title}"? Shipped drafts are kept.`)) return;
+    setError(null);
+    try {
+      await authed("/api/pair", { method: "DELETE", body: JSON.stringify({ sessionId: id }) });
+      if (session?.id === id) {
+        setSession(null);
+        setShowLauncher(true);
+      }
+      await loadSessions();
+      toast.success("Session deleted");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Delete failed";
+      setError(msg);
+      toast.error(msg);
+    }
+  }
+
   async function setDepth(depth: "deep" | "quick") {
     if (!session || session.critiqueDepth === depth) return;
     try {
@@ -593,6 +611,12 @@ export default function PairPage() {
                   </button>
                   <button onClick={() => ship()} className="btn-ghost">Ship all</button>
                   <button onClick={endSession} className="btn-ghost">End</button>
+                  <button
+                    onClick={() => session && deleteSession(session.id, session.title)}
+                    className="btn-ghost hover:border-red-700 hover:text-red-400"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
 
@@ -708,6 +732,7 @@ export default function PairPage() {
         onOpen={openSession}
         onNew={() => { setSession(null); setShowLauncher(true); }}
         onLoadMore={loadMoreSessions}
+        onDelete={deleteSession}
       />
     </main>
   );

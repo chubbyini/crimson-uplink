@@ -74,3 +74,31 @@ export async function GET(req: Request) {
     nextCursor: snap.docs.length === limit && last ? last.updatedAt : null,
   });
 }
+
+/**
+ * DELETE /api/pair — permanently delete a session (shipped drafts are kept).
+ * Body: { sessionId: string }.
+ */
+export async function DELETE(req: Request) {
+  if (!isAdminConfigured) {
+    return NextResponse.json({ error: "Server not configured" }, { status: 503 });
+  }
+  const token = req.headers.get("authorization")?.replace(/^Bearer /i, "");
+  if (!token) return NextResponse.json({ error: "Missing ID token" }, { status: 401 });
+
+  let uid: string;
+  try {
+    uid = await verifyFirebaseToken(token);
+  } catch (e) {
+    const reason = e instanceof Error ? e.message.split("\n")[0] : "Invalid ID token";
+    return NextResponse.json({ error: `Invalid ID token (${reason})` }, { status: 401 });
+  }
+
+  const { sessionId } = (await req.json().catch(() => ({}))) as { sessionId?: string };
+  if (!sessionId || !/^[A-Za-z0-9_-]{1,64}$/.test(sessionId)) {
+    return NextResponse.json({ error: "Invalid sessionId" }, { status: 400 });
+  }
+
+  await adminDb().doc(`users/${uid}/pair-sessions/${sessionId}`).delete();
+  return NextResponse.json({ ok: true });
+}
