@@ -243,6 +243,13 @@ body {
    the global cyber grid). Content sits above via .pair-stage. */
 .pair-stage {
   position: relative;
+}
+
+/* Content wrapper sits above .pair-bg. NOTE: no z-index on .pair-stage
+   itself — that would trap the fixed SessionDock below the global footer.
+   Keep floating layers (dock, drawer) as direct children of <main>. */
+.pair-content {
+  position: relative;
   z-index: 1;
 }
 

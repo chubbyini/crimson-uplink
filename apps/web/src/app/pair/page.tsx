@@ -450,6 +450,7 @@ export default function PairPage() {
   return (
     <main className="pair-stage mx-auto w-full max-w-6xl px-6 pt-12 pb-48">
       <div className="pair-bg" aria-hidden />
+      <div className="pair-content">
       <div className="flex flex-wrap items-center gap-3">
         <div>
           <h1 className="ui-title">Pair Writer</h1>
@@ -544,43 +545,8 @@ export default function PairPage() {
             </div>
           )}
 
-          {/* Picker drawer for ideas / drafts */}
-          {drawer && (
-            <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={() => setDrawer(null)}>
-              <div
-                role="dialog"
-                aria-label={drawer === "idea" ? "Pick an idea" : "Pick a draft"}
-                className="flex h-full w-full max-w-md flex-col border-l border-slate-800 bg-slate-950 p-5"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-semibold">
-                    Pick {drawer === "idea" ? "an idea" : "a draft"}
-                  </h2>
-                  <button onClick={refreshDrawer} className="btn-ghost ml-auto" disabled={drawerLoading}>
-                    {drawerLoading ? "…" : "Reload"}
-                  </button>
-                  <button onClick={() => setDrawer(null)} className="btn-ghost">Close</button>
-                </div>
-                {drawerLoading && <p className="mt-4 text-sm text-slate-400">Loading…</p>}
-                <div className="mt-4 flex flex-1 flex-col gap-2 overflow-y-auto">
-                  {drawerItems.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => { setSeedText(item.id); setDrawer(null); }}
-                      className="rounded-xl border border-slate-800 p-3 text-left hover:bg-white/5"
-                    >
-                      <span className="block truncate text-sm text-slate-200">{item.title}</span>
-                      <span className="mt-0.5 block truncate font-mono text-[11px] text-slate-500">{item.sub}</span>
-                    </button>
-                  ))}
-                  {!drawerLoading && drawerItems.length === 0 && (
-                    <p className="text-sm text-slate-500">Nothing here yet.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Picker drawer is rendered at the end of <main> (outside .pair-content)
+              so its z-50 overlay is never trapped under the dock. */}
 
           {session && !showLauncher && (
             <>
@@ -723,6 +689,44 @@ export default function PairPage() {
           )}
         </section>
       </div>
+      </div>
+
+      {drawer && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={() => setDrawer(null)}>
+          <div
+            role="dialog"
+            aria-label={drawer === "idea" ? "Pick an idea" : "Pick a draft"}
+            className="flex h-full w-full max-w-md flex-col border-l border-slate-800 bg-slate-950 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold">
+                Pick {drawer === "idea" ? "an idea" : "a draft"}
+              </h2>
+              <button onClick={refreshDrawer} className="btn-ghost ml-auto" disabled={drawerLoading}>
+                {drawerLoading ? "…" : "Reload"}
+              </button>
+              <button onClick={() => setDrawer(null)} className="btn-ghost">Close</button>
+            </div>
+            {drawerLoading && <p className="mt-4 text-sm text-slate-400">Loading…</p>}
+            <div className="mt-4 flex flex-1 flex-col gap-2 overflow-y-auto">
+              {drawerItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => { setSeedText(item.id); setDrawer(null); }}
+                  className="rounded-xl border border-slate-800 p-3 text-left hover:bg-white/5"
+                >
+                  <span className="block truncate text-sm text-slate-200">{item.title}</span>
+                  <span className="mt-0.5 block truncate font-mono text-[11px] text-slate-500">{item.sub}</span>
+                </button>
+              ))}
+              {!drawerLoading && drawerItems.length === 0 && (
+                <p className="text-sm text-slate-500">Nothing here yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <SessionDock
         sessions={sessions}
