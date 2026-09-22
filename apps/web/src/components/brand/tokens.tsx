@@ -42,7 +42,7 @@ export const SOJOURNER_VARIANTS: Array<{
   {
     id: "compass",
     name: "Compass",
-    story: "A traveller's rose with the needle locked forward. Pure journey symbolism.",
+    story: "Flat rose, needle locked forward, a ship circling counter-clockwise on patrol. Pure journey, no bloom.",
   },
 ];
 
@@ -85,12 +85,15 @@ export const PORTABLE_CSS = `
 @keyframes sj-spin { to { transform: rotate(360deg); } }
 @keyframes sj-spin-rev { to { transform: rotate(-360deg); } }
 @keyframes sj-wp { 0%, 100% { opacity: 0.22; } 12% { opacity: 1; } 32% { opacity: 0.45; } }
+@keyframes sj-strike { 0%, 100% { opacity: 1; } 3% { opacity: 0.35; } 5% { opacity: 1; } 7% { opacity: 0.6; } 9% { opacity: 1; } 55% { opacity: 1; } 57% { opacity: 0.5; } 59% { opacity: 1; } }
 @keyframes sj-breathe { 0%, 100% { opacity: 0.82; } 50% { opacity: 1; } }
 .sj-spin { animation: sj-spin var(--sj-speed, 14s) linear infinite; transform-box: fill-box; transform-origin: center; }
 .sj-spin-rev { animation: sj-spin-rev 30s linear infinite; transform-box: fill-box; transform-origin: center; }
 .sj-wp { animation: sj-wp 3s ease-in-out infinite; }
+.sj-strike { animation: sj-strike 4.2s linear infinite; }
+.sj-orbit { animation: sj-spin-rev var(--sj-speed, 30s) linear infinite; transform-box: view-box; transform-origin: 60px 60px; }
 .sj-breathe { animation: sj-breathe 5s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .sj-spin, .sj-spin-rev, .sj-wp, .sj-breathe { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sj-spin, .sj-spin-rev, .sj-wp, .sj-strike, .sj-orbit, .sj-breathe { animation: none; } }
 `.trim();
 
 export function SojournerToken({
@@ -136,11 +139,11 @@ export function SojournerToken({
         </filter>
       </defs>
 
-      {variant !== "waymark" && glow && <circle cx="60" cy="60" r="46" fill="url(#sj-core)" />}
+      {variant === "monogram" && glow && <circle cx="60" cy="60" r="46" fill="url(#sj-core)" />}
 
-      {variant !== "waymark" ? (
+      {variant === "monogram" && (
         <>
-          {/* Outer dial: faint counter-spinning orbit + main ring + ticks. */}
+          {/* Outer dial (monogram only — waymark and compass draw their own). */}
           <circle
             cx="60"
             cy="60"
@@ -170,27 +173,10 @@ export function SojournerToken({
                   />
                 );
               })}
-            {variant === "compass" &&
-              ["N", "E", "S", "W"].map((c, i) => {
-                const a = (i / 4) * Math.PI * 2 - Math.PI / 2;
-                return (
-                  <text
-                    key={c}
-                    x={60 + 44 * Math.cos(a)}
-                    y={60 + 44 * Math.sin(a)}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize="7"
-                    fontFamily="monospace"
-                    fill={c === "N" ? "#ff5c7a" : "#64748b"}
-                  >
-                    {c}
-                  </text>
-                );
-              })}
           </g>
         </>
-      ) : (
+      )}
+      {variant === "waymark" && (
         <>
           {/* Stark dial: hairline grey ring, sparse ticks, transparent ground. */}
           <g className={spin}>
@@ -235,11 +221,50 @@ export function SojournerToken({
               </>
             )}
           </g>
-          {/* The thunder: the single accent strike across the route. */}
-          <polygon
-            points="74,24 58,54 66,54 46,90 58,60 50,60"
-            fill={SJ_THUNDER}
-          />
+          {/* Zeus strike: edge-to-edge jagged trunk that breaks past the ring,
+              bone-hot core, forks reaching for the stations. Flat, no blur. */}
+          <g className={spinning ? "sj-strike" : undefined}>
+            <polyline
+              points="96,-2 84,14 90,18 74,36 80,40 62,60 68,64 52,82 58,86 40,104 46,108 34,122"
+              fill="none"
+              stroke={SJ_THUNDER}
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeLinejoin="miter"
+            />
+            <polyline
+              points="96,-2 84,14 90,18 74,36 80,40 62,60 68,64 52,82 58,86 40,104 46,108 34,122"
+              fill="none"
+              stroke={SJ_BONE}
+              strokeWidth="1.2"
+              strokeLinecap="round"
+              strokeLinejoin="miter"
+              strokeOpacity="0.9"
+            />
+            <polyline
+              points="74,36 60,42 54,38 42,46"
+              fill="none"
+              stroke={SJ_THUNDER}
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="miter"
+            />
+            <polyline
+              points="62,60 74,66 72,76 82,82"
+              fill="none"
+              stroke={SJ_THUNDER}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="miter"
+            />
+            <polyline
+              points="52,82 60,88 58,96"
+              fill="none"
+              stroke={SJ_BONE}
+              strokeWidth="1"
+              strokeLinecap="round"
+            />
+          </g>
         </>
       )}
 
@@ -272,21 +297,52 @@ export function SojournerToken({
 
       {variant === "compass" && (
         <>
-          {/* Traveller's rose, needle locked forward (up). */}
-          <g className={spinning ? "sj-breathe" : undefined}>
-            <polygon
-              points="60,24 66,54 96,60 66,66 60,96 54,66 24,60 54,54"
-              fill="url(#sj-crimson)"
-              filter={glowFilter}
-            />
-            <polygon points="60,42 63,57 78,60 63,63 60,78 57,63 42,60 57,57" fill="#0b0f1a" opacity="0.85" />
+          {/* Instrument dial: plain thin ring + cardinals (no clock ticks).
+              The ship orbits counter-clockwise, held upright, needle flat. */}
+          <g className={spin}>
+            <circle cx="60" cy="60" r="52" fill="none" stroke={SJ_GREY} strokeWidth="1.5" strokeOpacity="0.9" />
+            {["N", "E", "S", "W"].map((c, i) => {
+              const a = (i / 4) * Math.PI * 2 - Math.PI / 2;
+              return (
+                <text
+                  key={c}
+                  x={60 + 44 * Math.cos(a)}
+                  y={60 + 44 * Math.sin(a)}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize="7"
+                  fontFamily="monospace"
+                  fill={c === "N" ? SJ_BONE : SJ_FAINT}
+                >
+                  {c}
+                </text>
+              );
+            })}
+            {/* Ship on patrol: outer orbit runs CCW, inner spin cancels
+                tumble so the hull stays upright while circling. */}
+            <g className={spinning ? "sj-orbit" : undefined}>
+              <g transform="translate(60 8)">
+                <g className={spin}>
+                  <polygon points="-9,0 9,0 6,5 -6,5" fill={SJ_BONE} />
+                  <rect x="-1.5" y="-4" width="4" height="4" fill={SJ_GREY} />
+                  <line x1="0" y1="0" x2="0" y2="-10" stroke={SJ_GREY} strokeWidth="1.2" />
+                  <polygon points="0,-10 7.5,-1 0,-1" fill={SJ_GREY} />
+                </g>
+              </g>
+            </g>
           </g>
-          <g filter={glowFilter}>
-            <line x1="60" y1="76" x2="60" y2="30" stroke="#38bdf8" strokeWidth="3.5" strokeLinecap="round" />
-            <polygon points="60,22 65,32 55,32" fill="#38bdf8" />
-            <circle cx="60" cy="60" r="4.5" fill="#38bdf8" />
-            <circle cx="60" cy="60" r="2" fill="#0b0f1a" />
-          </g>
+          {/* Traveller's rose, flat. Needle locked forward (up), no bloom. */}
+          <polygon
+            points="60,24 66,54 96,60 66,66 60,96 54,66 24,60 54,54"
+            fill={SJ_GREY}
+            stroke={SJ_BONE}
+            strokeWidth="1"
+          />
+          <polygon points="60,42 63,57 78,60 63,63 60,78 57,63 42,60 57,57" fill="#0b0f1a" opacity="0.85" />
+          <line x1="60" y1="76" x2="60" y2="30" stroke={SJ_THUNDER} strokeWidth="3.5" strokeLinecap="round" />
+          <polygon points="60,22 65,32 55,32" fill={SJ_THUNDER} />
+          <circle cx="60" cy="60" r="4.5" fill={SJ_THUNDER} />
+          <circle cx="60" cy="60" r="2" fill="#0b0f1a" />
         </>
       )}
     </svg>
