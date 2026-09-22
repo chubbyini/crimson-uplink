@@ -131,12 +131,13 @@ export async function enrichAndScore<T extends ScorableItem>(
   geminiKey: string,
   jinaKey: string | undefined,
   items: T[],
-  topics?: string[]
+  topics?: string[],
+  opts: { enrichBudgetMs?: number } = {}
 ): Promise<EnrichAndScoreResult<T>> {
   const enriched = await enrichItemsWithExcerpts(items, {
     jinaKey,
     limit: 25,
-    budgetMs: 30000,
+    budgetMs: opts.enrichBudgetMs ?? 30000,
   });
   const ideas = await scoreIdeas(geminiKey, enriched.items, topics);
   const excerptByUrl = new Map<string, SourceExcerpt>();
@@ -163,7 +164,8 @@ export async function scoreForUser(
   db: Firestore,
   uid: string,
   settings: Settings,
-  topics?: string[]
+  topics?: string[],
+  opts: { enrichBudgetMs?: number } = {}
 ): Promise<ScoreResult> {
   if (!settings.geminiKey) throw new Error("Add your Gemini API key in Settings first");
 
@@ -206,7 +208,8 @@ export async function scoreForUser(
       settings.geminiKey,
       settings.jinaKey || undefined,
       items,
-      topics
+      topics,
+      { enrichBudgetMs: opts.enrichBudgetMs }
     );
     ideas = scored.ideas;
 

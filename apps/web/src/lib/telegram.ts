@@ -935,49 +935,66 @@ export async function handleIncomingMessage(
   // Handle /ingest (fresh full run) or /topics or general commands
   const lower = text.trim().toLowerCase();
   if (lower.startsWith("/ingest")) {
-    const { checkRateLimit } = await import("./rate-limit");
-    const rate = checkRateLimit(`tg-ingest:${chatId}`, 1, 5 * 60 * 1000);
-    if (!rate.success) {
-      await send("⏳ <b>/ingest</b> runs max once every 5 minutes — please wait a bit.", true);
-      return "rate-limited";
-    }
-
-    const { ingestForUser, loadSettings, scoreForUser } = await import("./pipeline");
-    const settings = await loadSettings(db, uid);
-    if (!settings) {
-      await send("Save your Settings in Crimson Uplink first.", false);
-      return "no-settings";
-    }
-
-    await send("🔄 <b>Running a fresh ingest…</b> pulling sources, may take up to a minute.", true);
+    // Catch-all: any unexpected throw below must TALK to the user — the
+    // webhook route only logs, which surfaces as "bot went silent".
     try {
-      const ingest = await ingestForUser(db, uid, settings);
-      await send(
-        `📥 <b>Ingest done:</b> ${ingest.fetched} fetched · ${ingest.added} new · ${ingest.seenBefore} seen before. Scoring ideas with Gemini…`,
-        true
-      );
-    } catch (e) {
-      await send(
-        `Ingest failed: ${esc(e instanceof Error ? e.message.split("\n")[0] : "unknown")}`,
-        false
-      );
-      return "ingest-failed";
-    }
-
-    try {
-      const topics = [...(settings.devtoTags ?? []), ...(settings.npmPackages ?? [])].slice(0, 8);
-      const scored = await scoreForUser(db, uid, settings, topics.length ? topics : undefined);
-      if (!scored.telegram.sent && scored.telegram.reason) {
-        await send(`💡 Scored <b>${scored.count} ideas</b>, but digest send failed: ${esc(scored.telegram.reason)}`, true);
-        return "ingest-scored-no-digest";
+      const { checkRateLimit } = await import("./rate-limit");
+      const rate = checkRateLimit(`tg-ingest:${chatId}`, 1, 5 * 60 * 1000);
+      if (!rate.success) {
+        await send("⏳ <b>/ingest</b> runs max once every 5 minutes — please wait a bit.", true);
+        return "rate-limited";
       }
-      return "ingested";
+
+      const { ingestForUser, loadSettings, scoreForUser } = await import("./pipeline");
+      const settings = await loadSettings(db, uid);
+      if (!settings) {
+        await send("Save your Settings in Crimson Uplink first.", false);
+        return "no-settings";
+      }
+
+      await send("🔄 <b>Running a fresh ingest…</b> pulling sources, may take up to a minute.", true);
+      try {
+        const ingest = await ingestForUser(db, uid, settings);
+        await send(
+          `📥 <b>Ingest done:</b> ${ingest.fetched} fetched · ${ingest.added} new · ${ingest.seenBefore} seen before. Reading sources + scoring with Gemini…`,
+          true
+        );
+      } catch (e) {
+        await send(
+          `Ingest failed: ${esc(e instanceof Error ? e.message.split("\n")[0] : "unknown")}`,
+          false
+        );
+        return "ingest-failed";
+      }
+
+      try {
+        const topics = [...(settings.devtoTags ?? []), ...(settings.npmPackages ?? [])].slice(0, 8);
+        // Tighter enrichment budget on the interactive path: the webhook
+        // caps at 60s, and partial excerpts still beat headline-only.
+        const scored = await scoreForUser(db, uid, settings, topics.length ? topics : undefined, {
+          enrichBudgetMs: 15000,
+        });
+        if (!scored.telegram.sent && scored.telegram.reason) {
+          await send(`💡 Scored <b>${scored.count} ideas</b>, but digest send failed: ${esc(scored.telegram.reason)}`, true);
+          return "ingest-scored-no-digest";
+        }
+        return "ingested";
+      } catch (e) {
+        await send(
+          `Scoring failed: ${esc(e instanceof Error ? e.message.split("\n")[0] : "unknown")}`,
+          false
+        );
+        return "score-failed";
+      }
     } catch (e) {
-      await send(
-        `Scoring failed: ${esc(e instanceof Error ? e.message.split("\n")[0] : "unknown")}`,
-        false
-      );
-      return "score-failed";
+      console.error("telegram /ingest failed:", e instanceof Error ? e.message : e);
+      try {
+        await send(
+          `❌ <b>/ingest crashed early:</b> ${esc(e instanceof Error ? e.message.split("\n")[0] : "unknown")}\nCheck Vercel logs for "telegram /ingest failed".`,
+          true
+        );
+      } catch {}
+      return "ingest-crashed";
     }
   }
 
@@ -1024,7 +1041,8 @@ export async function handleIncomingMessage(
       settings.geminiKey,
       settings.jinaKey || undefined,
       [...new Map(raw.map((i) => [i.url, i])).values()],
-      topics
+      topics,
+      { enrichBudgetMs: 20000 }
     );
     // Persist enriched items (excerpts ride along into the item cache).
     await storeItems(db, uid, scored.enrichedItems, { topicSearch: topics });
