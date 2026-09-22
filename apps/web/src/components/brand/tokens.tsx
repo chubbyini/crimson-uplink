@@ -1,20 +1,46 @@
 /**
- * Sojourner Builds — WAYMARK token.
+ * Sojourner Builds — token family (pick 1 of 3 in /logo).
  *
- * A traveller's mark: an angular S (always seeking) split by a forward path
- * (always moving), ringed by a mech dial carrying three waypoint dots that
- * light in sequence — Lagos → Kaduna → Cross River. The spin IS the journey;
- * the lighting waypoints are knowledge collected along the way.
+ * - WAYMARK: angular S (always seeking) split by a forward path (always
+ *   moving), ringed by a mech dial with three waypoint dots lighting in
+ *   sequence — Lagos → Kaduna → Cross River.
+ * - MONOGRAM: fused SB mark on a shared spine, pushed onward by a cyan
+ *   double-chevron. Cleaner, more corporate.
+ * - COMPASS: traveller's compass rose, needle locked forward, cardinal ring.
  *
  * PORTABLE BY DESIGN: pure SVG + props, no app imports. Pair with
- * PORTABLE_CSS below (same rules as globals.css sj-* classes) to drop this
- * into any project: `<style>{PORTABLE_CSS}</style>` + the rendered `<svg>`.
+ * PORTABLE_CSS below (same rules as globals.css sj-* classes) to drop the
+ * winner into any project.
  */
 
+export type SojournerVariant = "waymark" | "monogram" | "compass";
 export type SojournerSpeed = "slow" | "normal" | "fast";
 export type SojournerRing = "ticks" | "solid" | "none";
 
+export const SOJOURNER_VARIANTS: Array<{
+  id: SojournerVariant;
+  name: string;
+  story: string;
+}> = [
+  {
+    id: "waymark",
+    name: "Waymark",
+    story: "Your journey encoded: the seeking S, the forward path, three stations lighting — Lagos → Kaduna → Cross River.",
+  },
+  {
+    id: "monogram",
+    name: "Monogram",
+    story: "SB fused on one spine and shoved forward by a double-chevron. The corporate mark.",
+  },
+  {
+    id: "compass",
+    name: "Compass",
+    story: "A traveller's rose with the needle locked forward. Pure journey symbolism.",
+  },
+];
+
 export interface SojournerTokenProps {
+  variant?: SojournerVariant;
   size?: number;
   spinning?: boolean;
   speed?: SojournerSpeed;
@@ -67,16 +93,18 @@ export const PORTABLE_CSS = `
 `.trim();
 
 export function SojournerToken({
+  variant = "waymark",
   size = 96,
   spinning = true,
   speed = "normal",
   ring = "ticks",
   waypoints = true,
   glow = true,
-  title = "Sojourner Builds waymark",
+  title = "Sojourner Builds mark",
   className,
 }: SojournerTokenProps) {
   const spin = spinning ? "sj-spin" : undefined;
+  const glowFilter = glow ? "url(#sj-glow)" : undefined;
   return (
     <svg
       width={size}
@@ -85,6 +113,7 @@ export function SojournerToken({
       role="img"
       aria-label={title}
       className={className}
+      data-variant={variant}
       style={spinning ? ({ "--sj-speed": SPEED_MS[speed] } as React.CSSProperties) : undefined}
     >
       <defs>
@@ -108,7 +137,7 @@ export function SojournerToken({
 
       {glow && <circle cx="60" cy="60" r="46" fill="url(#sj-core)" />}
 
-      {/* Outer dial: faint orbit (counter-spin) + main ring + ticks (spin). */}
+      {/* Outer dial: faint counter-spinning orbit + main ring + ticks. */}
       <circle
         cx="60"
         cy="60"
@@ -138,7 +167,8 @@ export function SojournerToken({
               />
             );
           })}
-        {waypoints &&
+        {variant === "waymark" &&
+          waypoints &&
           WAYPOINTS.map((w) => (
             <g key={w.label}>
               <title>{w.label}</title>
@@ -154,32 +184,100 @@ export function SojournerToken({
               />
             </g>
           ))}
+        {variant === "compass" &&
+          ["N", "E", "S", "W"].map((c, i) => {
+            const a = (i / 4) * Math.PI * 2 - Math.PI / 2;
+            return (
+              <text
+                key={c}
+                x={60 + 44 * Math.cos(a)}
+                y={60 + 44 * Math.sin(a)}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize="7"
+                fontFamily="monospace"
+                fill={c === "N" ? "#ff5c7a" : "#64748b"}
+              >
+                {c}
+              </text>
+            );
+          })}
       </g>
 
-      {/* The S: angular, always seeking. */}
-      <g className={spinning ? "sj-breathe" : undefined}>
-        <path
-          d="M80 42 H46 Q39 42 39 49 L39 53 Q39 60 47 60 H73 Q81 60 81 68 L81 72 Q81 80 73 80 H44"
-          fill="none"
-          stroke="url(#sj-crimson)"
-          strokeWidth="9"
-          strokeLinecap="square"
-          filter={glow ? "url(#sj-glow)" : undefined}
-        />
-      </g>
+      {variant === "waymark" && (
+        <>
+          {/* The S: angular, always seeking. */}
+          <g className={spinning ? "sj-breathe" : undefined}>
+            <path
+              d="M80 42 H46 Q39 42 39 49 L39 53 Q39 60 47 60 H73 Q81 60 81 68 L81 72 Q81 80 73 80 H44"
+              fill="none"
+              stroke="url(#sj-crimson)"
+              strokeWidth="9"
+              strokeLinecap="square"
+              filter={glowFilter}
+            />
+          </g>
+          {/* The forward path: kinked momentum bolt cutting through, pointing onward. */}
+          <g filter={glowFilter}>
+            <polyline
+              points="33,89 60,62 55,53 87,31"
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <polygon points="87,24 93,36 81,33" fill="#38bdf8" />
+          </g>
+        </>
+      )}
 
-      {/* The forward path: kinked momentum bolt cutting through, pointing onward. */}
-      <g filter={glow ? "url(#sj-glow)" : undefined}>
-        <polyline
-          points="33,89 60,62 55,53 87,31"
-          fill="none"
-          stroke="#38bdf8"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <polygon points="87,24 93,36 81,33" fill="#38bdf8" />
-      </g>
+      {variant === "monogram" && (
+        <>
+          {/* Shared spine + fused SB, shoved forward by a double chevron. */}
+          <g filter={glowFilter}>
+            <rect x="36" y="34" width="8" height="52" fill="url(#sj-crimson)" />
+            <path
+              d="M78 40 H48 V48 H70 L76 54 V56 H48"
+              fill="none"
+              stroke="url(#sj-crimson)"
+              strokeWidth="7"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+            />
+            <path
+              d="M48 64 H68 L78 70 L68 76 H48 L74 76"
+              fill="none"
+              stroke="url(#sj-crimson)"
+              strokeWidth="7"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+            />
+            <polyline points="84,58 92,66 84,74" fill="none" stroke="#38bdf8" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points="92,58 100,66 92,74" fill="none" stroke="#38bdf8" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.55" />
+          </g>
+        </>
+      )}
+
+      {variant === "compass" && (
+        <>
+          {/* Traveller's rose, needle locked forward (up). */}
+          <g className={spinning ? "sj-breathe" : undefined}>
+            <polygon
+              points="60,24 66,54 96,60 66,66 60,96 54,66 24,60 54,54"
+              fill="url(#sj-crimson)"
+              filter={glowFilter}
+            />
+            <polygon points="60,42 63,57 78,60 63,63 60,78 57,63 42,60 57,57" fill="#0b0f1a" opacity="0.85" />
+          </g>
+          <g filter={glowFilter}>
+            <line x1="60" y1="76" x2="60" y2="30" stroke="#38bdf8" strokeWidth="3.5" strokeLinecap="round" />
+            <polygon points="60,22 65,32 55,32" fill="#38bdf8" />
+            <circle cx="60" cy="60" r="4.5" fill="#38bdf8" />
+            <circle cx="60" cy="60" r="2" fill="#0b0f1a" />
+          </g>
+        </>
+      )}
     </svg>
   );
 }

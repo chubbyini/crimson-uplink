@@ -3,9 +3,22 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { SojournerLoader } from "./SojournerLoader";
+import type { SojournerVariant } from "./tokens";
 
 const MIN_SHOW_MS = 600;
 const SAFETY_MS = 5000;
+/** Local pick from /logo (dev preview). Tell the builder the winner to hardwire it. */
+export const SOJOURNER_PICK_KEY = "sj-logo-pick";
+export const PICK_EVENT = "sj-logo-pick-changed";
+
+function readPick(): SojournerVariant {
+  try {
+    const v = localStorage.getItem(SOJOURNER_PICK_KEY);
+    return v === "monogram" || v === "compass" ? v : "waymark";
+  } catch {
+    return "waymark";
+  }
+}
 
 const VeilCtx = createContext<{ show: () => void }>({ show: () => {} });
 
@@ -22,6 +35,7 @@ export function useSojournerVeil() {
 export function SojournerVeilProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [visible, setVisible] = useState(false);
+  const [variant, setVariant] = useState<SojournerVariant>(readPick);
   const shownAt = useRef(0);
   const safety = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -46,10 +60,21 @@ export function SojournerVeilProvider({ children }: { children: React.ReactNode 
     []
   );
 
+  // Live-preview the /logo pick (same tab via event, other tabs via storage).
+  useEffect(() => {
+    const onChange = () => setVariant(readPick());
+    window.addEventListener(PICK_EVENT, onChange);
+    window.addEventListener("storage", onChange);
+    return () => {
+      window.removeEventListener(PICK_EVENT, onChange);
+      window.removeEventListener("storage", onChange);
+    };
+  }, []);
+
   return (
     <VeilCtx.Provider value={{ show }}>
       {children}
-      {visible && <SojournerLoader />}
+      {visible && <SojournerLoader variant={variant} />}
     </VeilCtx.Provider>
   );
 }
