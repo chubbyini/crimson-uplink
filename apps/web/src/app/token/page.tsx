@@ -33,24 +33,24 @@ export default function TokenPage() {
           SOJOURNER <span className="text-[#ff2a55]">BUILDS</span>
         </h1>
         <p className="ui-sub max-w-xl">
-          Always seeking knowledge. Always moving forward. Knowledge never ends —
-          so the traveller keeps going: Lagos → Kaduna → Cross River, and beyond.
+          No letterform — a long route winding through three weighted stations.
+          Always seeking knowledge. Always moving forward. Lagos → Kaduna → Cross River, and beyond.
         </p>
       </div>
 
       <div className="mt-12 grid gap-4 md:grid-cols-3">
         <div className="ui-panel p-5">
-          <h2 className="text-sm font-semibold text-slate-200">The S — always seeking</h2>
+          <h2 className="text-sm font-semibold text-slate-200">The route, not the letter</h2>
           <p className="mt-2 text-sm text-slate-400">
-            An angular S for the promise: never stop seeking knowledge. It breathes
-            slowly while the dial spins around it.
+            One long off-white path through three stations sized by weight —
+            Lagos lightest, Cross River full: where I am now. The journey, drawn.
           </p>
         </div>
         <div className="ui-panel p-5">
-          <h2 className="text-sm font-semibold text-slate-200">The path — always moving</h2>
+          <h2 className="text-sm font-semibold text-slate-200">One thunder, one accent</h2>
           <p className="mt-2 text-sm text-slate-400">
-            A kinked momentum bolt cuts through the mark and points onward. You go
-            around, you move, you gather.
+            A single electric strike across the route. Off-white, mid-grey,
+            transparent ground — no glow, hairline strokes, nothing decorative.
           </p>
         </div>
         <div className="ui-panel p-5">

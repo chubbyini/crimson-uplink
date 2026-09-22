@@ -17,6 +17,13 @@ export type SojournerVariant = "waymark" | "monogram" | "compass";
 export type SojournerSpeed = "slow" | "normal" | "fast";
 export type SojournerRing = "ticks" | "solid" | "none";
 
+/** Stark palette: off-white line, mid-grey secondary, transparent ground. */
+export const SJ_BONE = "#e8e6e1";
+export const SJ_GREY = "#8a8f98";
+export const SJ_FAINT = "#5b6068";
+/** The single accent: thunder blue. */
+export const SJ_THUNDER = "#38bdf8";
+
 export const SOJOURNER_VARIANTS: Array<{
   id: SojournerVariant;
   name: string;
@@ -25,7 +32,7 @@ export const SOJOURNER_VARIANTS: Array<{
   {
     id: "waymark",
     name: "Waymark",
-    story: "Your journey encoded: the seeking S, the forward path, three stations lighting — Lagos → Kaduna → Cross River.",
+    story: "No letterform — a long route winding through three weighted stations. Lagos smallest, Cross River full weight: where I am now. One thunder strike, one accent.",
   },
   {
     id: "monogram",
@@ -58,12 +65,6 @@ const SPEED_MS: Record<SojournerSpeed, string> = {
 };
 
 const TICKS = Array.from({ length: 24 }, (_, i) => i);
-// Waypoint stations: top (Lagos), lower-right (Kaduna), lower-left (Cross River).
-const WAYPOINTS = [
-  { x: 60, y: 8, delay: "0s", label: "Lagos" },
-  { x: 105.0, y: 86, delay: "1s", label: "Kaduna" },
-  { x: 15.0, y: 86, delay: "2s", label: "Cross River" },
-];
 
 function tickCoords(i: number): { x1: number; y1: number; x2: number; y2: number; major: boolean } {
   const major = i % 6 === 0;
@@ -135,100 +136,110 @@ export function SojournerToken({
         </filter>
       </defs>
 
-      {glow && <circle cx="60" cy="60" r="46" fill="url(#sj-core)" />}
+      {variant !== "waymark" && glow && <circle cx="60" cy="60" r="46" fill="url(#sj-core)" />}
 
-      {/* Outer dial: faint counter-spinning orbit + main ring + ticks. */}
-      <circle
-        cx="60"
-        cy="60"
-        r="57"
-        fill="none"
-        stroke="#ff2a55"
-        strokeOpacity="0.28"
-        strokeWidth="1"
-        strokeDasharray="3 7"
-        className={spinning ? "sj-spin-rev" : undefined}
-      />
-      <g className={spin}>
-        <circle cx="60" cy="60" r="52" fill="none" stroke="url(#sj-crimson)" strokeWidth="4" strokeOpacity="0.92" />
-        {ring === "ticks" &&
-          TICKS.map((i) => {
-            const t = tickCoords(i);
-            return (
-              <line
-                key={i}
-                x1={t.x1}
-                y1={t.y1}
-                x2={t.x2}
-                y2={t.y2}
-                stroke="#ff5c7a"
-                strokeOpacity={t.major ? 0.95 : 0.5}
-                strokeWidth={t.major ? 2.2 : 1.2}
-              />
-            );
-          })}
-        {variant === "waymark" &&
-          waypoints &&
-          WAYPOINTS.map((w) => (
-            <g key={w.label}>
-              <title>{w.label}</title>
-              <circle cx={w.x} cy={w.y} r="6.5" fill="none" stroke="#ff2a55" strokeOpacity="0.5" strokeWidth="1" />
-              <circle
-                cx={w.x}
-                cy={w.y}
-                r="3.2"
-                fill="#ff5c7a"
-                filter="url(#sj-glow)"
-                className="sj-wp"
-                style={{ animationDelay: w.delay }}
-              />
-            </g>
-          ))}
-        {variant === "compass" &&
-          ["N", "E", "S", "W"].map((c, i) => {
-            const a = (i / 4) * Math.PI * 2 - Math.PI / 2;
-            return (
-              <text
-                key={c}
-                x={60 + 44 * Math.cos(a)}
-                y={60 + 44 * Math.sin(a)}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize="7"
-                fontFamily="monospace"
-                fill={c === "N" ? "#ff5c7a" : "#64748b"}
-              >
-                {c}
-              </text>
-            );
-          })}
-      </g>
-
-      {variant === "waymark" && (
+      {variant !== "waymark" ? (
         <>
-          {/* The S: angular, always seeking. */}
-          <g className={spinning ? "sj-breathe" : undefined}>
+          {/* Outer dial: faint counter-spinning orbit + main ring + ticks. */}
+          <circle
+            cx="60"
+            cy="60"
+            r="57"
+            fill="none"
+            stroke="#ff2a55"
+            strokeOpacity="0.28"
+            strokeWidth="1"
+            strokeDasharray="3 7"
+            className={spinning ? "sj-spin-rev" : undefined}
+          />
+          <g className={spin}>
+            <circle cx="60" cy="60" r="52" fill="none" stroke="url(#sj-crimson)" strokeWidth="4" strokeOpacity="0.92" />
+            {ring === "ticks" &&
+              TICKS.map((i) => {
+                const t = tickCoords(i);
+                return (
+                  <line
+                    key={i}
+                    x1={t.x1}
+                    y1={t.y1}
+                    x2={t.x2}
+                    y2={t.y2}
+                    stroke="#ff5c7a"
+                    strokeOpacity={t.major ? 0.95 : 0.5}
+                    strokeWidth={t.major ? 2.2 : 1.2}
+                  />
+                );
+              })}
+            {variant === "compass" &&
+              ["N", "E", "S", "W"].map((c, i) => {
+                const a = (i / 4) * Math.PI * 2 - Math.PI / 2;
+                return (
+                  <text
+                    key={c}
+                    x={60 + 44 * Math.cos(a)}
+                    y={60 + 44 * Math.sin(a)}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize="7"
+                    fontFamily="monospace"
+                    fill={c === "N" ? "#ff5c7a" : "#64748b"}
+                  >
+                    {c}
+                  </text>
+                );
+              })}
+          </g>
+        </>
+      ) : (
+        <>
+          {/* Stark dial: hairline grey ring, sparse ticks, transparent ground. */}
+          <g className={spin}>
+            <circle cx="60" cy="60" r="52" fill="none" stroke={SJ_GREY} strokeWidth="1.5" strokeOpacity="0.9" />
+            {ring === "ticks" &&
+              Array.from({ length: 12 }, (_, i) => i * 2).map((t) => {
+                const c = tickCoords(t);
+                return (
+                  <line
+                    key={t}
+                    x1={c.x1}
+                    y1={c.y1}
+                    x2={c.x2}
+                    y2={c.y2}
+                    stroke={c.major ? SJ_BONE : SJ_FAINT}
+                    strokeOpacity={c.major ? 0.9 : 0.8}
+                    strokeWidth={c.major ? 1.5 : 1}
+                  />
+                );
+              })}
+            {/* The long route: Lagos → Kaduna → Cross River, ending onward. */}
             <path
-              d="M80 42 H46 Q39 42 39 49 L39 53 Q39 60 47 60 H73 Q81 60 81 68 L81 72 Q81 80 73 80 H44"
+              d="M60 8 C 70 34, 92 46, 105 86 C 84 93, 38 93, 15 86"
               fill="none"
-              stroke="url(#sj-crimson)"
-              strokeWidth="9"
-              strokeLinecap="square"
-              filter={glowFilter}
-            />
-          </g>
-          {/* The forward path: kinked momentum bolt cutting through, pointing onward. */}
-          <g filter={glowFilter}>
-            <polyline
-              points="33,89 60,62 55,53 87,31"
-              fill="none"
-              stroke="#38bdf8"
-              strokeWidth="4"
+              stroke={SJ_BONE}
+              strokeWidth="2"
               strokeLinecap="round"
-              strokeLinejoin="round"
             />
-            <polygon points="87,24 93,36 81,33" fill="#38bdf8" />
+            <polygon points="15,86 25,82 23.5,90.5" fill={SJ_BONE} />
+            {waypoints && (
+              <>
+                {/* Lagos — origin, lightest. Kaduna — mid weight. Cross River — full weight: now. */}
+                <circle cx="60" cy="8" r="1.8" fill="none" stroke={SJ_GREY} strokeWidth="1.2">
+                  <title>Lagos</title>
+                </circle>
+                <circle cx="105" cy="86" r="3" fill={SJ_GREY}>
+                  <title>Kaduna</title>
+                </circle>
+                <circle cx="15" cy="86" r="5.5" fill={SJ_BONE} className="sj-wp">
+                  <title>Cross River — now</title>
+                </circle>
+              </>
+            )}
           </g>
+          {/* The thunder: the single accent strike across the route. */}
+          <polygon
+            points="74,24 58,54 66,54 46,90 58,60 50,60"
+            fill={SJ_THUNDER}
+          />
         </>
       )}
 
