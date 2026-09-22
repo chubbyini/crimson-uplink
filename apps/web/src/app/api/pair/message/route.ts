@@ -21,7 +21,7 @@ const MAX_MSG = 4000;
 /**
  * POST /api/pair/message — one pair turn (free chat or /command).
  * Body: { sessionId: string, text: string }.
- * Commands: /rewrite /critique [deep|quick] /depth [deep|quick]
+ * Commands: /rewrite /critique [deep|quick] /depth [deep|quick] /phase <plan|draft|critique>
  *           /new <title> /switch <n> /ship [n|all] /end
  */
 export async function POST(req: Request) {
@@ -87,6 +87,25 @@ export async function POST(req: Request) {
       if (!depth) return NextResponse.json({ error: "Usage: /depth deep|quick" }, { status: 400 });
       session.critiqueDepth = depth;
       await sessionRef(db, uid, safeId).update({ critiqueDepth: depth, updatedAt: now });
+      return NextResponse.json({ ok: true, session });
+    }
+    if (cmd === "/phase") {
+      const p = arg === "plan" ? "plan" : arg === "draft" ? "draft" : arg === "critique" ? "critique" : null;
+      if (!p) return NextResponse.json({ error: "Usage: /phase plan|draft|critique" }, { status: 400 });
+      const hint =
+        p === "plan"
+          ? "We converge on angle and outline now — no drafting yet, spar with me."
+          : p === "draft"
+            ? "We write now — ask for sections or /rewrite the working copy."
+            : "I evaluate without rewriting now — ask for /critique deep or quick.";
+      session.phase = p;
+      await pushTurn("user", msg);
+      await pushTurn("assistant", `Phase set to ${p}. ${hint}`);
+      await sessionRef(db, uid, safeId).update({
+        phase: p,
+        history: session.history,
+        updatedAt: now,
+      });
       return NextResponse.json({ ok: true, session });
     }
     if (cmd === "/new") {

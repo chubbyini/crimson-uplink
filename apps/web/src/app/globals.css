@@ -239,11 +239,65 @@ body {
   border-right: 2px solid #ff2a55;
 }
 
+/* Pair Writer stage: horizon-glow + perspective grid floor (distinct from
+   the global cyber grid). Content sits above via .pair-stage. */
+.pair-stage {
+  position: relative;
+  z-index: 1;
+}
+
+.pair-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(55% 34% at 50% 0%, rgba(255, 42, 85, 0.14), transparent 70%),
+    radial-gradient(40% 30% at 85% 100%, rgba(56, 189, 248, 0.08), transparent 70%),
+    #05070d;
+  overflow: hidden;
+}
+.pair-bg::before {
+  content: '';
+  position: absolute;
+  left: -25%;
+  right: -25%;
+  bottom: -12%;
+  height: 62%;
+  background-image:
+    linear-gradient(rgba(255, 42, 85, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.14) 1px, transparent 1px);
+  background-size: 46px 46px;
+  transform: perspective(650px) rotateX(62deg);
+  transform-origin: bottom;
+  mask-image: linear-gradient(to top, black 35%, transparent 95%);
+  animation: pair-grid-drift 12s linear infinite;
+}
+.pair-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 3px, rgba(0, 0, 0, 0.22) 3px 4px),
+    radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+@keyframes pair-grid-drift {
+  from {
+    background-position-y: 0;
+  }
+  to {
+    background-position-y: 46px;
+  }
+}
+
 /* Carmine mech cycler tabs (Pair Writer article ring) */
 .mech-cycler {
   display: flex;
   align-items: stretch;
   gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .mech-track {
@@ -273,11 +327,13 @@ body {
   gap: 0.3rem;
   padding: 0.6rem 0.75rem;
   text-align: left;
-  color: #cbd5e1;
-  background: linear-gradient(160deg, rgba(30, 10, 18, 0.9), rgba(2, 6, 23, 0.9));
-  border: 1px solid rgba(255, 42, 85, 0.25);
+  color: #e2e8f0;
+  /* Near-opaque so plates read solid on mobile over the grid backdrop. */
+  background: linear-gradient(160deg, rgba(92, 14, 32, 0.98), rgba(8, 10, 22, 0.98));
+  border: 1px solid rgba(255, 42, 85, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 90, 120, 0.55), 0 2px 12px rgba(0, 0, 0, 0.6);
   clip-path: polygon(0.65rem 0, 100% 0, 100% calc(100% - 0.65rem), calc(100% - 0.65rem) 100%, 0 100%, 0 0.65rem);
-  opacity: 0.6;
+  opacity: 0.85;
   transform: scale(0.94);
   transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
   overflow: hidden;
@@ -287,10 +343,11 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(255, 255, 255, 0.015) 2px 3px);
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.18) 2px 3px);
 }
 .mech-plate:hover {
-  opacity: 0.9;
+  opacity: 1;
+  border-color: rgba(255, 42, 85, 0.9);
 }
 .mech-plate:focus-visible {
   outline: 2px solid #ff2a55;
@@ -301,9 +358,10 @@ body {
 .mech-plate-active {
   opacity: 1;
   transform: scale(1.05);
-  border-color: rgba(255, 42, 85, 0.9);
-  box-shadow: 0 0 24px rgba(255, 0, 60, 0.35), inset 0 0 18px rgba(255, 42, 85, 0.08);
-  color: #f1f5f9;
+  background: linear-gradient(160deg, rgba(140, 18, 44, 0.98), rgba(20, 8, 16, 0.98));
+  border-color: #ff2a55;
+  box-shadow: inset 0 1px 0 rgba(255, 140, 165, 0.8), 0 0 28px rgba(255, 0, 60, 0.55), 0 2px 14px rgba(0, 0, 0, 0.6);
+  color: #fff;
   z-index: 1;
 }
 .mech-plate-active::before {
@@ -332,7 +390,7 @@ body {
   font-family: var(--font-geist-mono), monospace;
   font-size: 0.65rem;
   letter-spacing: 0.1em;
-  color: #ff8fa8;
+  color: #ff5c7a;
 }
 
 .mech-title {
@@ -361,9 +419,10 @@ body {
   height: 3.5rem;
   font-size: 1.5rem;
   line-height: 1;
-  color: #ff8fa8;
-  background: linear-gradient(160deg, rgba(30, 10, 18, 0.9), rgba(2, 6, 23, 0.9));
-  border: 1px solid rgba(255, 42, 85, 0.4);
+  color: #ff5c7a;
+  background: linear-gradient(160deg, rgba(92, 14, 32, 0.98), rgba(8, 10, 22, 0.98));
+  border: 1px solid rgba(255, 42, 85, 0.6);
+  box-shadow: inset 0 1px 0 rgba(255, 90, 120, 0.5);
   clip-path: polygon(0.5rem 0, 100% 0, 100% calc(100% - 0.5rem), calc(100% - 0.5rem) 100%, 0 100%, 0 0.5rem);
 }
 .mech-chevron:hover {
@@ -408,5 +467,8 @@ body {
   }
   .mech-track {
     scroll-behavior: auto;
+  }
+  .pair-bg::before {
+    animation: none;
   }
 }

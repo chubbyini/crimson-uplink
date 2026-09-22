@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { loadSettings } from "@/lib/pipeline";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { checkDailyLlmCap, recordLlmUsage } from "@/lib/usage";
 import { assertDocId } from "@/lib/validation";
-import { pairTurn } from "@/lib/pair/chat";
 import type {
   PairArticle,
   PairMode,
@@ -59,13 +57,6 @@ export async function POST(req: Request) {
   const pairMode: PairMode = mode === "batch" ? "batch" : seeds.length > 1 ? "batch" : "series";
 
   const db = adminDb();
-  const cap = await checkDailyLlmCap(db, uid, 1);
-  if (!cap.allowed) {
-    return NextResponse.json(
-      { error: `Daily AI limit reached (${cap.used}/${cap.cap}). Try again tomorrow.` },
-      { status: 429 }
-    );
-  }
 
   // Build one article per seed.
   const articles: PairArticle[] = [];
@@ -196,28 +187,13 @@ export async function POST(req: Request) {
   };
   await ref.set(session);
 
-  // Opening partner message (one LLM call; static fallback keeps it robust).
-  const { loadVoiceProfile } = await import("@/lib/corpus/voice-analyzer");
-  const voiceGuide = await loadVoiceProfile(db, uid);
+  // Opening partner message: static so sessions open instantly (no blocking
+  // LLM call). The first real turn carries full context.
   const seedNote = seedNotes.join(" ");
-  let opener =
+  const opener =
     articles.length > 1
-      ? `Batch session with ${articles.length} articles on the bench. We'll work them one at a time — tell me where to start. Commands: /rewrite /critique /new /switch /ship /end.`
-      : `Let's build "${articles[0].title}" together. Tell me where your head is at — angle, audience, what's bugging you — and we'll shape it from there. Commands: /rewrite /critique /new /switch /ship /end.`;
-  try {
-    const res = await pairTurn(
-      settings.groqKey,
-      { ...session, history: [], historySummary: "", summarizedCount: 0 },
-      articles[0],
-      `(A new pair-writing session just started${articles.length > 1 ? ` with ${articles.length} articles: ${articles.map((a, i) => `${i + 1}. "${a.title}"`).join("; ")}` : ""}. Open the collaboration in 3-5 sentences: what excites you about this piece, one sharp question about angle or audience, and how we'll work. Do not draft yet.${seedNote ? ` ${seedNote}` : ""})`,
-      voiceGuide,
-      "chat"
-    );
-    opener = res.text;
-    await recordLlmUsage(db, uid, 1);
-  } catch {
-    // Static opener above.
-  }
+      ? `Batch session live — ${articles.length} articles on the bench (${articles.map((a, i) => `${i + 1}. "${a.title}"`).join("; ")}). Tell me where to start: angle, audience, what's bugging you. Commands: /rewrite /critique /phase /switch /ship /end.`
+      : `Let's build "${articles[0].title}" together. Tell me where your head is at — angle, audience, what's bugging you — and we'll shape it from there. Commands: /rewrite /critique /phase /ship /end.${seedNote ? ` Note: ${seedNote}` : ""}`;
 
   await ref.update({
     history: [{ role: "assistant", text: opener, at: new Date().toISOString() }],

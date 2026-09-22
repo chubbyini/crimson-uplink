@@ -53,6 +53,12 @@ interface SessionSummary {
 
 type SeedKind = "idea" | "draft" | "blank" | "excerpts" | "paragraph";
 
+const PHASE_TIPS: Record<string, string> = {
+  plan: "Converge on angle + outline — no drafting yet, spar with your pair",
+  draft: "Write now — ask for sections or /rewrite the working copy",
+  critique: "Evaluate only — feedback without rewrites until you say so",
+};
+
 const QUICK_CMDS = ["/rewrite", "/critique", "/critique deep", "/ship", "/end"];
 
 export default function PairPage() {
@@ -424,7 +430,8 @@ export default function PairPage() {
   const activeIdx = session ? session.articles.findIndex((a) => a.id === session.activeArticleId) : -1;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 pt-12 pb-48">
+    <main className="pair-stage mx-auto w-full max-w-6xl px-6 pt-12 pb-48">
+      <div className="pair-bg" aria-hidden />
       <div className="flex flex-wrap items-center gap-3">
         <div>
           <h1 className="ui-title">Pair Writer</h1>
@@ -561,7 +568,19 @@ export default function PairPage() {
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="meta-pill">{session.mode}</span>
-                <span className="meta-pill">phase: {session.phase}</span>
+                <div className="flex gap-1" role="group" aria-label="Phase">
+                  {(["plan", "draft", "critique"] as const).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => sendMessage(`/phase ${p}`)}
+                      disabled={sending}
+                      title={PHASE_TIPS[p]}
+                      className={session.phase === p ? "chip-active" : "chip"}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
                 <span className="meta-pill">depth: {session.critiqueDepth}</span>
                 <span className="meta-pill">{session.status}</span>
                 <div className="ml-auto flex gap-2">

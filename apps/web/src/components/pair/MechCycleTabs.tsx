@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 export interface MechTabArticle {
   id: string;
@@ -23,27 +23,21 @@ const LAMP: Record<string, string> = {
   shipped: "bg-cyan-400",
 };
 
-const DRIFT_MS = 8000;
-const RESUME_MS = 15000;
-
 /**
- * Carmine-mech article cycler: a rotating ring strip where every option is
- * visible, the active plate is enlarged + lit, selection wraps around, and
- * the ring gently auto-drifts when idle (pauses on hover/focus/touch).
+ * Carmine-mech article cycler: a ring strip where every option is visible,
+ * the active plate is enlarged + lit, and selection wraps around.
+ * Manual only: click a plate, use the chevrons, or arrow keys.
  */
 export default function MechCycleTabs({ articles, activeId, onSelect, onNew }: Props) {
   const n = articles.length;
   const activeIdx = Math.max(0, articles.findIndex((a) => a.id === activeId));
   const trackRef = useRef<HTMLDivElement>(null);
   const plateRefs = useRef(new Map<string, HTMLButtonElement>());
-  const [hovering, setHovering] = useState(false);
-  const lastManual = useRef(0);
 
   const select = useCallback(
     (idx: number) => {
       if (!n) return;
       const wrapped = ((idx % n) + n) % n;
-      lastManual.current = Date.now();
       onSelect(articles[wrapped].id);
     },
     [n, articles, onSelect]
@@ -58,18 +52,6 @@ export default function MechCycleTabs({ articles, activeId, onSelect, onNew }: P
     el?.scrollIntoView({ behavior: calm ? "auto" : "smooth", inline: "center", block: "nearest" });
   }, [activeId, n]);
 
-  // Gentle auto-drift; any manual cycle restarts the idle clock.
-  useEffect(() => {
-    if (n <= 1) return;
-    const t = setInterval(() => {
-      if (hovering) return;
-      if (Date.now() - lastManual.current < RESUME_MS) return;
-      if (trackRef.current?.matches(":focus-within")) return;
-      onSelect(articles[((activeIdx + 1) % n)].id);
-    }, DRIFT_MS);
-    return () => clearInterval(t);
-  }, [n, activeIdx, hovering, articles, onSelect]);
-
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowRight") {
       e.preventDefault();
@@ -83,8 +65,6 @@ export default function MechCycleTabs({ articles, activeId, onSelect, onNew }: P
   return (
     <div
       className="mech-cycler"
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
     >
       {n > 1 && (
         <button
