@@ -13,7 +13,7 @@ export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const SECRET_FIELDS = ["geminiKey", "groqKey", "devtoKey", "linkedinToken", "githubToken"] as const;
+const SECRET_FIELDS = ["geminiKey", "groqKey", "devtoKey", "linkedinToken", "githubToken", "jinaKey"] as const;
 
 /**
  * GET /api/settings — get user settings (secret API keys are MASKED in the response).

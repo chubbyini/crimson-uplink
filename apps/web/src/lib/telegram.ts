@@ -110,7 +110,7 @@ export async function sendDraftCard(
   chatId: string | number,
   uid: string,
   draftId: string,
-  draft: { title: string; body: string; format?: string; model?: string; linkedinBody?: string },
+  draft: { title: string; body: string; format?: string; model?: string; linkedinBody?: string; contextSummary?: string },
   note?: string
 ) {
   const b = getBot();
@@ -136,7 +136,9 @@ export async function sendDraftCard(
   // 2. Control card with approval + copy actions.
   const text =
     `📝 <b>Review: ${esc(trunc(title, 80))}</b>\n` +
-    `<i>${wordCount} words · ${esc(draft.model || "Groq")}${hasLi ? " · 💼 LinkedIn post ready" : ""}</i>\n\n` +
+    `<i>${wordCount} words · ${esc(draft.model || "Groq")}${hasLi ? " · 💼 LinkedIn post ready" : ""}</i>\n` +
+    (draft.contextSummary ? `🌱 <i>${esc(draft.contextSummary)}</i>\n` : "") +
+    `\n` +
     `Full text is above ☝️ — read it, then approve, edit, or grab the copy-ready version:`;
 
   await b.api.sendMessage(String(chatId), text, {
@@ -303,22 +305,31 @@ export async function handleCallback(
       angle: string;
       format?: "linkedin" | "x" | "devto";
       sourceUrls?: string[];
+      sourceExcerpts?: Array<{ url: string; excerpt: string; via: "jina" | "self" }>;
     };
 
     const progressMsg = await b.api.sendMessage(
       String(fromChatId),
-      `⏳ <i>Drafting article + refining for LinkedIn with Groq:</i>\n<b>${esc(trunc(idea.title, 80))}</b>…`,
+      `⏳ <i>Reading sources + drafting article with Groq:</i>\n<b>${esc(trunc(idea.title, 80))}</b>…`,
       { parse_mode: "HTML" }
     );
 
     try {
       const { generateDraft, refineForLinkedin } = await import("./draft/generate");
+      const { buildDraftContext, formatContextSummary } = await import("./context/excerpts");
+      const ctx = await buildDraftContext(
+        idea.sourceExcerpts?.length
+          ? idea.sourceExcerpts
+          : (idea.sourceUrls ?? []).map((url) => ({ url })),
+        { jinaKey: settings.jinaKey || undefined }
+      );
+      const contextSummary = formatContextSummary(ctx);
       const draftRes = await generateDraft(settings.groqKey, {
         title: idea.title,
         angle: idea.angle,
         format: idea.format || "devto",
         sourceUrls: idea.sourceUrls || [],
-      });
+      }, undefined, ctx.sources);
 
       let linkedinBody = "";
       try {
@@ -340,6 +351,9 @@ export async function handleCallback(
         status: "pending_review",
         createdAt: now,
         updatedAt: now,
+        contextSources: ctx.sources.map((s) => s.url),
+        contextChars: ctx.chars,
+        contextSummary,
       });
       await db.doc(`users/${uid}/ideas/${safeId}`).update({ status: "drafted" });
 
@@ -353,6 +367,7 @@ export async function handleCallback(
         format: idea.format,
         model: draftRes.model,
         linkedinBody,
+        contextSummary,
       });
       return "drafted";
     } catch (e) {
@@ -395,6 +410,7 @@ export async function handleCallback(
       format?: string;
       model?: string;
       linkedinBody?: string;
+      contextSummary?: string;
     };
     await sendDraftCard(fromChatId, uid, safeId, draft);
     return "view-article";
@@ -786,6 +802,7 @@ export async function handleIncomingMessage(
         format?: string;
         model?: string;
         linkedinBody?: string;
+        contextSummary?: string;
       };
       const { loadSettings } = await import("./pipeline");
       const settings = await loadSettings(db, uid);
@@ -902,6 +919,7 @@ export async function handleIncomingMessage(
             format: draft.format,
             model: edited.model,
             linkedinBody: newLiBody,
+            contextSummary: draft.contextSummary,
           },
           "✨ <b>Article draft updated with your instructions!</b>"
         );
@@ -986,40 +1004,39 @@ export async function handleIncomingMessage(
     return "no-topics";
   }
 
-  const { SettingsSchema } = await import("./settings");
+  const { loadSettings, enrichAndScore, storeItems } = await import("./pipeline");
   const { searchTopics } = await import("./search");
-  const { scoreIdeas } = await import("./ideas/score");
-  const { storeItems } = await import("./pipeline");
 
-  const settingsSnap = await db.doc(`users/${uid}/settings/config`).get();
-  const settings = SettingsSchema.parse(settingsSnap.data());
-  if (!settings.geminiKey) {
+  const settings = await loadSettings(db, uid);
+  if (!settings?.geminiKey) {
     await send("Add your Gemini API key in Settings first.", false);
     return "no-key";
   }
 
-  await send(`Researching <b>${esc(topics.join(", "))}</b>… give me up to a minute.`);
+  await send(`Researching <b>${esc(topics.join(", "))}</b>… reading sources + scoring, give me up to a minute.`);
   const now = new Date().toISOString();
   try {
     const raw = await searchTopics({
       topics,
       githubToken: settings.githubToken || undefined,
     });
-    await storeItems(db, uid, raw, { topicSearch: topics });
-    const ideas = await scoreIdeas(
+    const scored = await enrichAndScore(
       settings.geminiKey,
-      [...new Map(raw.map((i) => [i.url, i])).values()].map((i) => ({
-        title: i.title,
-        url: i.url,
-        source: i.source,
-        points: i.points,
-        commentCount: i.commentCount,
-      })),
+      settings.jinaKey || undefined,
+      [...new Map(raw.map((i) => [i.url, i])).values()],
       topics
     );
+    // Persist enriched items (excerpts ride along into the item cache).
+    await storeItems(db, uid, scored.enrichedItems, { topicSearch: topics });
+    if (scored.keylessJina) {
+      await send(
+        "ℹ️ <i>Reading sources via Jina free tier — add a Jina key in Settings for higher limits.</i>",
+        true
+      );
+    }
 
     const batch = db.batch();
-    const ids = ideas.map((idea) => {
+    const ids = scored.ideas.map((idea) => {
       const ref = db.collection(`users/${uid}/ideas`).doc();
       batch.set(ref, { ...idea, status: "new", createdAt: now, topicSearch: topics });
       return ref.id;
@@ -1029,7 +1046,7 @@ export async function handleIncomingMessage(
     await sendDigest(
       String(chatId),
       uid,
-      ideas.map((idea, n) => ({ ...idea, id: ids[n] }))
+      scored.ideas.map((idea, n) => ({ ...idea, id: ids[n] }))
     );
     return "digested";
   } catch (e) {

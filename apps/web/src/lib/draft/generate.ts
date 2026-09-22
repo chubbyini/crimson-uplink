@@ -10,6 +10,45 @@ export interface DraftInput {
   sourceUrls: string[];
 }
 
+/**
+ * One source read from two independent angles: Jina Reader extraction and
+ * our direct-fetch extraction. Either side may be absent (fetch failed).
+ */
+export interface SourceContextSection {
+  url: string;
+  jina?: string;
+  self?: string;
+}
+
+/** Render the dual-angle source material block for the draft prompt. */
+function formatSourceContext(sections: SourceContextSection[]): string {
+  const usable = sections.filter((s) => s.jina?.trim() || s.self?.trim());
+  if (!usable.length) return "";
+  const out: string[] = [
+    `SOURCE MATERIAL — two independent extractions of the same linked sources (Jina Reader + direct fetch).`,
+  ];
+  const jina = usable.filter((s) => s.jina?.trim());
+  if (jina.length) {
+    out.push(`--- JINA READER EXTRACTION ---`);
+    jina.forEach((s, n) => out.push(`[${n + 1}] ${s.url}\n${s.jina!.trim()}`));
+  }
+  const self = usable.filter((s) => s.self?.trim());
+  if (self.length) {
+    out.push(`--- DIRECT FETCH EXTRACTION ---`);
+    self.forEach((s, n) => out.push(`[${n + 1}] ${s.url}\n${s.self!.trim()}`));
+  }
+  out.push(
+    [
+      `GROUNDING RULES:`,
+      `- Cross-check both angles: where they agree, treat it as solid ground; where they conflict, prefer the more specific claim and never present contested details as certain.`,
+      `- Stay faithful to the sources' facts, claims, and terminology; do not invent specifics or attribute anything the sources don't support.`,
+      `- You may expand beyond the sources with your own analysis to honor the angle below, but keep expansions clearly as your take, not the sources'.`,
+      `- Reference or link the sources where you draw on them.`,
+    ].join("\n")
+  );
+  return out.join("\n\n");
+}
+
 const styleCache = new Map<string, { text: string; at: number }>();
 const STYLE_TTL_MS = 5 * 60 * 1000;
 
@@ -44,11 +83,13 @@ import { withExponentialBackoff } from "@/lib/ai/retry";
 export async function generateDraft(
   apiKey: string,
   idea: DraftInput,
-  customVoiceGuide?: string
+  customVoiceGuide?: string,
+  sourceContext: SourceContextSection[] = []
 ): Promise<{ text: string; model: string }> {
   const groq = createGroq({ apiKey });
   const model = process.env.GROQ_MODEL ?? "openai/gpt-oss-120b";
   const style = customVoiceGuide || (await styleGuide());
+  const contextBlock = formatSourceContext(sourceContext);
 
   const { text } = await withExponentialBackoff(
     async () =>
@@ -66,6 +107,7 @@ export async function generateDraft(
           `Angle (the core take — honor it deeply): ${idea.angle}`,
           `Sources to reference or attribute (link where applicable):`,
           ...(idea.sourceUrls.length ? idea.sourceUrls.map((u) => `- ${u}`) : ["- (Topic-based deep dive)"]),
+          ...(contextBlock ? [``, contextBlock] : []),
         ].join("\n"),
         maxOutputTokens: 4000,
       }),

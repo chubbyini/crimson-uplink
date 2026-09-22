@@ -60,7 +60,7 @@ export function decryptField(ciphertext: string): string {
   }
 }
 
-const SECRET_FIELDS = ["geminiKey", "groqKey", "devtoKey", "linkedinToken", "githubToken"] as const;
+const SECRET_FIELDS = ["geminiKey", "groqKey", "devtoKey", "linkedinToken", "githubToken", "jinaKey"] as const;
 
 /** Mask a secret string so it never exposes full plaintext over HTTP. */
 export function maskSecret(secret: string): string {

@@ -26,4 +26,6 @@ export type IdeaStatus = "new" | "approved" | "skipped" | "drafted";
 export interface StoredIdea extends Idea {
   status: IdeaStatus;
   createdAt: string;
+  /** Article excerpts carried forward so drafts align with the originals. */
+  sourceExcerpts?: Array<{ url: string; excerpt: string; via: "jina" | "self" }>;
 }

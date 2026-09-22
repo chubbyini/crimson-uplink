@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { generateDraft } from "@/lib/draft/generate";
-import { loadSettings, storeItems } from "@/lib/pipeline";
-import { scoreIdeas } from "@/lib/ideas/score";
+import { buildDraftContext, formatContextSummary } from "@/lib/context/excerpts";
+import { loadSettings, storeItems, enrichAndScore } from "@/lib/pipeline";
 import { searchTopics } from "@/lib/search";
 
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -69,37 +69,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Daily AI limit reached (${cap.used}/${cap.cap}). Try again tomorrow.` }, { status: 429 });
   }
   const raw = await searchTopics({ topics: clean, githubToken: settings.githubToken || undefined });
-  const stored = await storeItems(db, uid, raw, { topicSearch: clean });
   const now = new Date().toISOString();
 
-  // Score a URL-deduped view of the haul.
+  // Enrich top candidates with article excerpts, then score (angles reflect
+  // the originals). Enriched items are stored so excerpts hit the item cache.
   const forScoring = [...new Map(raw.map((i) => [i.url, i])).values()];
-
-  // Score the haul.
-  let ideas;
+  let scored;
   try {
-    ideas = await scoreIdeas(
+    scored = await enrichAndScore(
       settings.geminiKey,
-      forScoring.map((i) => ({
-        title: i.title,
-        url: i.url,
-        source: i.source,
-        points: i.points,
-        commentCount: i.commentCount,
-      })),
+      settings.jinaKey || undefined,
+      forScoring,
       clean
     );
   } catch (e) {
     return NextResponse.json(
       {
         fetched: raw.length,
-        unique: stored.unique,
-        added: stored.added,
+        unique: 0,
+        added: 0,
         error: e instanceof Error ? `Gemini failed: ${e.message}` : "Gemini failed",
       },
       { status: 502 }
     );
   }
+  const stored = await storeItems(db, uid, scored.enrichedItems, { topicSearch: clean });
+  const ideas = scored.ideas;
 
   const ideaBatch = db.batch();
   const cleanIdea = (o: Record<string, unknown>) =>
@@ -117,7 +112,7 @@ export async function POST(req: Request) {
   await ideaBatch.commit();
 
   // Auto-draft the top idea (skipped cleanly without a Groq key).
-  let draft: { id: string; title: string } | null = null;
+  let draft: { id: string; title: string; contextSummary?: string } | null = null;
   let draftNote: string | undefined;
   if (autoDraft !== false && ideas.length) {
     if (!settings.groqKey) {
@@ -127,12 +122,19 @@ export async function POST(req: Request) {
         const top = ideas[0];
         const { loadVoiceProfile } = await import("@/lib/corpus/voice-analyzer");
         const voiceGuide = await loadVoiceProfile(db, uid);
+        const ctx = await buildDraftContext(
+          top.sourceExcerpts?.length
+            ? top.sourceExcerpts
+            : (top.sourceUrls ?? []).map((url) => ({ url })),
+          { jinaKey: settings.jinaKey || undefined }
+        );
+        const contextSummary = formatContextSummary(ctx);
         const text = await generateDraft(settings.groqKey, {
           title: top.title,
           angle: top.angle,
           format: top.format,
           sourceUrls: top.sourceUrls,
-        }, voiceGuide);
+        }, voiceGuide, ctx.sources);
         const ref = db.collection(`users/${uid}/drafts`).doc();
         await ref.set({
           ideaId: ideaIds[0],
@@ -143,9 +145,12 @@ export async function POST(req: Request) {
           status: "pending_review",
           createdAt: now,
           topicSearch: clean,
+          contextSources: ctx.sources.map((s) => s.url),
+          contextChars: ctx.chars,
+          contextSummary,
         });
         await db.doc(`users/${uid}/ideas/${ideaIds[0]}`).update({ status: "drafted" });
-        draft = { id: ref.id, title: top.title };
+        draft = { id: ref.id, title: top.title, contextSummary };
       } catch (e) {
         draftNote = e instanceof Error ? `Groq failed: ${e.message}` : "Groq failed";
       }

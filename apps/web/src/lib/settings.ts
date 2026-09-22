@@ -9,6 +9,7 @@ export const SettingsSchema = z.object({
   linkedinToken: z.string().default(""),
   telegramChatId: z.string().default(""),
   githubToken: z.string().default(""),
+  jinaKey: z.string().default(""),
   rssFeeds: z.array(z.string()).default([]),
   youtubeChannelIds: z.array(z.string()).default([]),
   blueskyHandles: z.array(z.string()).default([]),

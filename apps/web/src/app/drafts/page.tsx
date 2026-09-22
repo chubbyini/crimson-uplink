@@ -27,6 +27,7 @@ interface DraftRow {
   model: string;
   status: "pending_review" | "approved" | "rejected" | "published";
   createdAt: string;
+  contextSummary?: string;
 }
 
 export default function DraftsPage() {
@@ -326,6 +327,11 @@ export default function DraftsPage() {
                 {d.status}
               </span>
               <span className="font-mono text-slate-500">{d.model}</span>
+              {d.contextSummary && (
+                <span className="meta-pill" title="What grounded this draft">
+                  🌱 {d.contextSummary}
+                </span>
+              )}
             </div>
             <p className="mt-2 text-lg font-semibold">{d.title}</p>
             <button

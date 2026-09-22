@@ -18,6 +18,10 @@ export interface RawItem {
   publishedAt?: string;
   points?: number;
   commentCount?: number;
+  /** cached article excerpt so scoring/drafting reads content, not headlines */
+  excerpt?: string;
+  excerptVia?: "jina" | "self";
+  excerptAt?: string;
 }
 
 export interface StoredItem extends RawItem {

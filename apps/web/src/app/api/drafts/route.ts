@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb, isAdminConfigured, verifyFirebaseToken } from "@/lib/firebase-admin";
 import { generateDraft } from "@/lib/draft/generate";
+import { buildDraftContext, formatContextSummary } from "@/lib/context/excerpts";
 import { loadSettings } from "@/lib/pipeline";
 import { assertDocId } from "@/lib/validation";
 
@@ -70,6 +71,7 @@ export async function POST(req: Request) {
     format: "linkedin" | "x" | "devto";
     sourceUrls: string[];
     status: string;
+    sourceExcerpts?: Array<{ url: string; excerpt: string; via: "jina" | "self" }>;
   };
   if (idea.status !== "approved" && idea.status !== "drafted") {
     return NextResponse.json({ error: "Approve the idea first" }, { status: 400 });
@@ -82,13 +84,25 @@ export async function POST(req: Request) {
   const voiceGuide = await loadVoiceProfile(db, uid);
 
   let draft: { text: string; model: string };
+  let contextSummary = "Sources unreadable — drafted from headline, please double-check";
+  let contextSources: string[] = [];
+  let contextChars = 0;
   try {
+    const ctx = await buildDraftContext(
+      idea.sourceExcerpts?.length
+        ? idea.sourceExcerpts
+        : (idea.sourceUrls ?? []).map((url) => ({ url })),
+      { jinaKey: settings.jinaKey || undefined }
+    );
+    contextSummary = formatContextSummary(ctx);
+    contextSources = ctx.sources.map((s) => s.url);
+    contextChars = ctx.chars;
     draft = await generateDraft(settings.groqKey, {
       title: idea.title,
       angle: idea.angle,
       format: idea.format,
       sourceUrls: idea.sourceUrls ?? [],
-    }, voiceGuide);
+    }, voiceGuide, ctx.sources);
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? `Groq failed: ${e.message}` : "Groq failed" },
@@ -107,9 +121,12 @@ export async function POST(req: Request) {
     model: draft.model,
     status: "pending_review",
     createdAt: now,
+    contextSources,
+    contextChars,
+    contextSummary,
   });
   batch.update(db.doc(`users/${uid}/ideas/${safeIdeaId}`), { status: "drafted" });
   await batch.commit();
 
-  return NextResponse.json({ id: ref.id, ...draft, ideaId: safeIdeaId });
+  return NextResponse.json({ id: ref.id, ...draft, ideaId: safeIdeaId, contextSummary });
 }

@@ -1,7 +1,13 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { runIngest, type RawItem } from "@/lib/ingest";
 import { urlHash } from "@/lib/ingest/normalize";
-import { scoreIdeas } from "@/lib/ideas/score";
+import { scoreIdeas, type ScorableItem } from "@/lib/ideas/score";
+import type { Idea } from "@/lib/ideas/schema";
+import {
+  attachExcerptsToIdeas,
+  enrichItemsWithExcerpts,
+  type SourceExcerpt,
+} from "@/lib/context/excerpts";
 import { sendDigest } from "@/lib/telegram";
 import { SettingsSchema, type Settings } from "@/lib/settings";
 
@@ -108,6 +114,50 @@ export async function ingestForUser(
   return { fetched: raw.length, ...stored };
 }
 
+export interface EnrichAndScoreResult<T = ScorableItem> {
+  ideas: Array<Idea & { sourceExcerpts: SourceExcerpt[] }>;
+  enrichedItems: T[];
+  fetched: number;
+  cached: number;
+  keylessJina: boolean;
+}
+
+/**
+ * Shared scoring path (cron, /ingest, /topics): read article excerpts for the
+ * top candidates, score with Gemini (angles reflect the originals), and carry
+ * excerpts forward on each idea for draft grounding.
+ */
+export async function enrichAndScore<T extends ScorableItem>(
+  geminiKey: string,
+  jinaKey: string | undefined,
+  items: T[],
+  topics?: string[]
+): Promise<EnrichAndScoreResult<T>> {
+  const enriched = await enrichItemsWithExcerpts(items, {
+    jinaKey,
+    limit: 25,
+    budgetMs: 30000,
+  });
+  const ideas = await scoreIdeas(geminiKey, enriched.items, topics);
+  const excerptByUrl = new Map<string, SourceExcerpt>();
+  for (const item of enriched.items) {
+    if (item.excerpt?.trim()) {
+      excerptByUrl.set(item.url, {
+        url: item.url,
+        excerpt: item.excerpt.slice(0, 2000),
+        via: item.excerptVia ?? "self",
+      });
+    }
+  }
+  return {
+    ideas: attachExcerptsToIdeas(ideas, excerptByUrl),
+    enrichedItems: enriched.items,
+    fetched: enriched.fetched,
+    cached: enriched.cached,
+    keylessJina: enriched.keylessJina,
+  };
+}
+
 /** Score freshest items into ideas + best-effort Telegram digest. */
 export async function scoreForUser(
   db: Firestore,
@@ -122,7 +172,7 @@ export async function scoreForUser(
     .orderBy("lastSeenAt", "desc")
     .limit(100)
     .get();
-  const items = itemsSnap.docs
+  const docs = itemsSnap.docs
     .map((d) => {
       const v = d.data() as {
         title?: string;
@@ -130,22 +180,56 @@ export async function scoreForUser(
         source?: string;
         points?: number;
         commentCount?: number;
+        excerpt?: string;
+        excerptVia?: "jina" | "self";
+        excerptAt?: string;
       };
-      return {
-        title: v.title ?? "(untitled)",
-        url: v.url ?? "",
-        source: v.source ?? "rss",
-        points: v.points,
-        commentCount: v.commentCount,
-      };
+      return { ref: d.ref, v };
     })
-    .filter((i) => i.url);
+    .filter((x) => x.v.url);
+  const items = docs.map((x) => ({
+    title: x.v.title ?? "(untitled)",
+    url: x.v.url as string,
+    source: x.v.source ?? "rss",
+    points: x.v.points,
+    commentCount: x.v.commentCount,
+    excerpt: x.v.excerpt,
+    excerptVia: x.v.excerptVia,
+    excerptAt: x.v.excerptAt,
+  }));
 
   if (!items.length) throw new Error("No items yet — run ingest first");
 
-  let ideas;
+  let ideas: EnrichAndScoreResult["ideas"];
   try {
-    ideas = await scoreIdeas(settings.geminiKey, items, topics);
+    const scored = await enrichAndScore(
+      settings.geminiKey,
+      settings.jinaKey || undefined,
+      items,
+      topics
+    );
+    ideas = scored.ideas;
+
+    // Write back freshly fetched excerpts so later runs reuse the cache.
+    const before = new Map(docs.map((x) => [x.v.url as string, x.v.excerptAt]));
+    const wb = db.batch();
+    let writes = 0;
+    for (const item of scored.enrichedItems) {
+      if (!item.excerpt || before.get(item.url) === item.excerptAt) continue;
+      const doc = docs.find((x) => x.v.url === item.url)?.ref;
+      if (!doc) continue;
+      wb.set(
+        doc,
+        cleanDoc({
+          excerpt: item.excerpt,
+          excerptVia: item.excerptVia ?? "self",
+          excerptAt: item.excerptAt,
+        }),
+        { merge: true }
+      );
+      writes += 1;
+    }
+    if (writes) await wb.commit();
   } catch (e) {
     throw new Error(
       e instanceof Error ? `Gemini failed: ${e.message}` : "Gemini failed"

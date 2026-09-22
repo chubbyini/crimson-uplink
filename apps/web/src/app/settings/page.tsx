@@ -208,6 +208,17 @@ export default function SettingsPage() {
           />
         </label>
         <label className="block text-sm font-medium">
+          Jina AI Reader key (optional — higher source-reading limits; without it we use the free tier)
+          <input
+            type="password"
+            autoComplete="off"
+            value={form.jinaKey}
+            onChange={(e) => set("jinaKey", e.target.value)}
+            placeholder="jina_…"
+            className={inputCls}
+          />
+        </label>
+        <label className="block text-sm font-medium">
           Telegram chat ID (shared bot → your DMs)
           <input
             inputMode="numeric"
