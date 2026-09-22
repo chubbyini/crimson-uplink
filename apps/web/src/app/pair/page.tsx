@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { isFirebaseConfigured } from "@/lib/firebase";
+import { isFirebaseConfigured, db } from "@/lib/firebase";
+import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { PageSkeleton } from "@/components/Skeletons";
@@ -69,6 +70,10 @@ export default function PairPage() {
   const [seedMode, setSeedMode] = useState<"series" | "batch">("series");
   const [seedText, setSeedText] = useState("");
   const [seedTitle, setSeedTitle] = useState("");
+  const [queue, setQueue] = useState<Array<{ label: string; entry: Record<string, unknown> }>>([]);
+  const [drawer, setDrawer] = useState<null | "idea" | "draft">(null);
+  const [drawerItems, setDrawerItems] = useState<Array<{ id: string; title: string; sub: string }>>([]);
+  const [drawerLoading, setDrawerLoading] = useState(false);
   const [newArticleTitle, setNewArticleTitle] = useState<string | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
 
@@ -167,9 +172,11 @@ export default function PairPage() {
 
   async function startSession() {
     setError(null);
-    let entry;
+    let entries: Record<string, unknown>[];
     try {
-      entry = buildEntry();
+      const current = seedText.trim() || seedTitle.trim() ? buildEntry() : null;
+      entries = [...queue.map((q) => q.entry), ...(current ? [current as unknown as Record<string, unknown>] : [])];
+      if (!entries.length) throw new Error("Add at least one seed — fill the form or queue several");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Invalid seed";
       setError(msg);
@@ -180,20 +187,68 @@ export default function PairPage() {
     try {
       const data = await authed("/api/pair/start", {
         method: "POST",
-        body: JSON.stringify({ entry, mode: seedMode }),
+        body: JSON.stringify({ entries, mode: entries.length > 1 ? "batch" : seedMode }),
       });
       setSession(data as PairSession);
       setShowLauncher(false);
       setSeedText("");
       setSeedTitle("");
+      setQueue([]);
       await loadSessions();
-      toast.success("Pair session open ✓");
+      toast.success(
+        entries.length > 1 ? `Batch session open with ${entries.length} articles ✓` : "Pair session open ✓"
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to start session";
       setError(msg);
       toast.error(msg);
     } finally {
       setStarting(false);
+    }
+  }
+
+  function queueCurrentSeed() {
+    try {
+      const entry = buildEntry();
+      const label =
+        seedKind === "idea" ? `Idea ${seedText.trim().slice(0, 12)}…`
+        : seedKind === "draft" ? `Draft ${seedText.trim().slice(0, 12)}…`
+        : seedKind === "blank" ? `Blank: ${seedText.trim().slice(0, 40)}`
+        : `${seedKind}: ${seedTitle.trim().slice(0, 40) || "(untitled)"}`;
+      setQueue((q) => [...q, { label, entry: entry as unknown as Record<string, unknown> }]);
+      setSeedText("");
+      setSeedTitle("");
+      toast.success("Seed queued — add another or open the session");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Invalid seed";
+      setError(msg);
+      toast.error(msg);
+    }
+  }
+
+  async function openDrawer(kind: "idea" | "draft") {
+    setDrawer(kind);
+    setDrawerItems([]);
+    if (!user || !db) return;
+    setDrawerLoading(true);
+    try {
+      const snap = await getDocs(
+        query(collection(db, "users", user.uid, kind === "idea" ? "ideas" : "drafts"), orderBy("createdAt", "desc"), limit(30))
+      );
+      setDrawerItems(
+        snap.docs.map((d) => {
+          const v = d.data() as { title?: string; angle?: string; status?: string; format?: string };
+          return {
+            id: d.id,
+            title: v.title ?? "(untitled)",
+            sub: kind === "idea" ? `${v.status ?? ""} · ${(v.angle ?? "").slice(0, 80)}` : `${v.status ?? ""} · ${v.format ?? ""}`,
+          };
+        })
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to load list");
+    } finally {
+      setDrawerLoading(false);
     }
   }
 
@@ -373,22 +428,86 @@ export default function PairPage() {
                   className="input mt-3"
                 />
               )}
+              {(seedKind === "idea" || seedKind === "draft") && (
+                <button onClick={() => openDrawer(seedKind)} className="btn-ghost mt-3">
+                  Browse {seedKind === "idea" ? "ideas" : "drafts"}…
+                </button>
+              )}
               <textarea
                 rows={seedKind === "blank" || seedKind === "idea" || seedKind === "draft" ? 2 : 6}
                 value={seedText}
                 onChange={(e) => setSeedText(e.target.value)}
                 placeholder={
-                  seedKind === "idea" ? "Idea ID (from Ideas page)"
-                  : seedKind === "draft" ? "Draft ID (from Drafts page)"
+                  seedKind === "idea" ? "Idea ID (or Browse…)"
+                  : seedKind === "draft" ? "Draft ID (or Browse…)"
                   : seedKind === "blank" ? "What should we write about?"
                   : seedKind === "excerpts" ? "Paste source material…"
                   : "Paste or write your paragraph…"
                 }
                 className="input mt-3"
               />
-              <button onClick={startSession} disabled={starting} className="btn-primary mt-3 h-10 px-5">
-                {starting ? "Opening…" : "Open pair session"}
-              </button>
+              {queue.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {queue.map((q, i) => (
+                    <span key={i} className="meta-pill">
+                      {i + 1}. {q.label}{" "}
+                      <button
+                        onClick={() => setQueue((prev) => prev.filter((_, j) => j !== i))}
+                        aria-label={`Remove seed ${i + 1}`}
+                        className="ml-1 text-red-400"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={queueCurrentSeed} className="btn-ghost h-10">
+                  + Queue this seed{queue.length > 0 ? ` (${queue.length + 1})` : ""}
+                </button>
+                <button onClick={startSession} disabled={starting} className="btn-primary h-10 px-5">
+                  {starting ? "Opening…" : queue.length > 0 ? `Open batch session (${queue.length + (seedText.trim() || seedTitle.trim() ? 1 : 0)})` : "Open pair session"}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Queue several seeds (blank twice, excerpts twice…) to open one batch session with many articles.
+              </p>
+            </div>
+          )}
+
+          {/* Picker drawer for ideas / drafts */}
+          {drawer && (
+            <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={() => setDrawer(null)}>
+              <div
+                role="dialog"
+                aria-label={drawer === "idea" ? "Pick an idea" : "Pick a draft"}
+                className="flex h-full w-full max-w-md flex-col border-l border-slate-800 bg-slate-950 p-5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-semibold">
+                    Pick {drawer === "idea" ? "an idea" : "a draft"}
+                  </h2>
+                  <button onClick={() => setDrawer(null)} className="btn-ghost ml-auto">Close</button>
+                </div>
+                {drawerLoading && <p className="mt-4 text-sm text-slate-400">Loading…</p>}
+                <div className="mt-4 flex flex-1 flex-col gap-2 overflow-y-auto">
+                  {drawerItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => { setSeedText(item.id); setDrawer(null); }}
+                      className="rounded-xl border border-slate-800 p-3 text-left hover:bg-white/5"
+                    >
+                      <span className="block truncate text-sm text-slate-200">{item.title}</span>
+                      <span className="mt-0.5 block truncate font-mono text-[11px] text-slate-500">{item.sub}</span>
+                    </button>
+                  ))}
+                  {!drawerLoading && drawerItems.length === 0 && (
+                    <p className="text-sm text-slate-500">Nothing here yet.</p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
