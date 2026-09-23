@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { SojournerToken } from "@/components/brand/tokens";
+import { SojournerToken } from "@sojournerbuilds/mark/tokens";
+import { SojournerLoader } from "@sojournerbuilds/mark/loader";
 
-const IMPORT_SNIPPET = `import { SojournerToken } from "@/components/brand/tokens";
-import { SojournerLoader } from "@/components/brand/SojournerLoader";
+const IMPORT_SNIPPET = `npm install @sojournerbuilds/mark
+import "@sojournerbuilds/mark/token.css";
+import "@sojournerbuilds/mark/veil.css";
+import { SojournerToken } from "@sojournerbuilds/mark/tokens";
+import { SojournerLoader } from "@sojournerbuilds/mark/loader";
 
 // Inline mark (tab spinner, empty state, button)
 <SojournerToken size={48} />
@@ -16,6 +20,7 @@ import { SojournerLoader } from "@/components/brand/SojournerLoader";
 /** Public showcase for the Sojourner Builds waymark. No auth required. */
 export default function TokenPage() {
   const [copied, setCopied] = useState(false);
+  const [veil, setVeil] = useState(false);
   async function copy() {
     try {
       await navigator.clipboard.writeText(IMPORT_SNIPPET);
@@ -36,7 +41,17 @@ export default function TokenPage() {
           No letterform — a long route winding through three weighted stations.
           Always seeking knowledge. Always moving forward. Lagos → Kaduna → Cross River, and beyond.
         </p>
+        <button
+          onClick={() => {
+            setVeil(true);
+            setTimeout(() => setVeil(false), 2600);
+          }}
+          className="btn-primary mt-5 h-10 px-6"
+        >
+          Show loading screen
+        </button>
       </div>
+      {veil && <SojournerLoader label="Previewing the veil…" />}
 
       <div className="mt-12 grid gap-4 md:grid-cols-3">
         <div className="ui-panel p-5">

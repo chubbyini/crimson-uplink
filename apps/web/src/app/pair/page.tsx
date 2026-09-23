@@ -8,6 +8,7 @@ import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { PageSkeleton } from "@/components/Skeletons";
+import { useSojournerVeil } from "@sojournerbuilds/mark/next";
 import MechCycleTabs from "@/components/pair/MechCycleTabs";
 import SessionDock from "@/components/pair/SessionDock";
 
@@ -283,12 +284,14 @@ export default function PairPage() {
   }
 
   // Preload picker lists while the launcher is visible so the drawer opens instantly.
+  // Veil-covered: lifts when both Firestore reads settle (or fail).
+  const { track: trackVeil } = useSojournerVeil();
   useEffect(() => {
     if (!showLauncher || pickCache) return;
     // Prefetch-on-view: not render-derived state, safe to kick off here.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadPickLists().catch(() => {});
-  }, [showLauncher, user]);
+    void trackVeil(loadPickLists().catch(() => null));
+  }, [showLauncher, user, pickCache, trackVeil]);
 
   async function openDrawer(kind: "idea" | "draft") {
     setDrawer(kind);

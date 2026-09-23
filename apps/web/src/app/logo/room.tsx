@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
-import { PICK_EVENT, SOJOURNER_PICK_KEY } from "@/components/brand/NavigationVeil";
+import { PICK_EVENT, SOJOURNER_PICK_KEY } from "@sojournerbuilds/mark/next";
 import {
   PORTABLE_CSS,
   SOJOURNER_VARIANTS,
@@ -11,7 +11,7 @@ import {
   type SojournerRing,
   type SojournerSpeed,
   type SojournerVariant,
-} from "@/components/brand/tokens";
+} from "@sojournerbuilds/mark/tokens";
 
 const NOTES_KEY = "sj-logo-notes";
 
@@ -36,6 +36,7 @@ export default function LogoRoom() {
   const [glow, setGlow] = useState(true);
   const [spinning, setSpinning] = useState(true);
   const [size, setSize] = useState(220);
+  const [backdrop, setBackdrop] = useState<"dark" | "light">("dark");
   const [notes, setNotes] = useState(() => {
     try {
       return localStorage.getItem(NOTES_KEY) ?? "";
@@ -86,7 +87,7 @@ export default function LogoRoom() {
       `## Notes`,
       notes.trim() || "(no notes yet)",
       ``,
-      `Apply to apps/web/src/components/brand/tokens.tsx (${variant.id}) and confirm in /logo.`,
+      `Apply to packages/mark/src/tokens.tsx (${variant.id}) and confirm in /logo.`,
     ].join("\n");
     void copyText(brief, "Brief copied — paste it back in chat");
   }
@@ -137,7 +138,18 @@ export default function LogoRoom() {
         <div className="ui-panel flex flex-col items-center p-8">
           <h2 className="text-lg font-semibold">{variant.name}</h2>
           <p className="mt-1 max-w-sm text-center text-sm text-slate-400">{variant.story}</p>
-          <div ref={previewRef} className="mt-4">
+          <div className="mt-4 flex gap-2" role="group" aria-label="Preview backdrop">
+            {(["dark", "light"] as const).map((b) => (
+              <button key={b} onClick={() => setBackdrop(b)} className={backdrop === b ? "chip-active" : "chip"}>
+                on {b}
+              </button>
+            ))}
+          </div>
+          <div
+            ref={previewRef}
+            className="mt-2 flex w-full justify-center rounded-xl p-6 transition-colors"
+            style={{ background: backdrop === "dark" ? "#05070d" : "#f1f5f9" }}
+          >
             <SojournerToken
               variant={variant.id}
               size={size}
@@ -146,6 +158,7 @@ export default function LogoRoom() {
               ring={ring}
               waypoints={waypoints}
               glow={glow}
+              theme={backdrop}
             />
           </div>
           <button onClick={() => select(variant.id)} className="btn-primary mt-5 h-10 px-6">

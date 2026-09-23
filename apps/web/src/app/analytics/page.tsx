@@ -18,6 +18,7 @@ import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { PageSkeleton } from "@/components/Skeletons";
+import { useSojournerVeil } from "@sojournerbuilds/mark/next";
 
 type Platform = "linkedin" | "devto" | "x" | "medium";
 
@@ -43,6 +44,7 @@ export default function AnalyticsPage() {
   const { user, loading: authLoading } = useAuth();
   const toast = useToast();
   const router = useRouter();
+  const { track } = useSojournerVeil();
   const [rows, setRows] = useState<PublishRow[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "syncing" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -85,9 +87,10 @@ export default function AnalyticsPage() {
       return;
     }
     // Auth-gated initial fetch: runs once per sign-in, not per render.
+    // Veil-covered: lifts when the Firestore read settles (or fails).
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load(user);
-  }, [user, authLoading, router]);
+    void track(load(user));
+  }, [user, authLoading, router, track]);
 
   async function logPublish(e: React.FormEvent) {
     e.preventDefault();

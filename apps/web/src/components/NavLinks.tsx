@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { type User } from "firebase/auth";
 import { useAuth } from "@/components/AuthProvider";
-import { useSojournerVeil } from "@/components/brand/NavigationVeil";
+import { useSojournerVeil } from "@sojournerbuilds/mark/next";
 
 /** Null while signed out (landing stays clean); user once authenticated. */
 function useSignedIn(): User | null {

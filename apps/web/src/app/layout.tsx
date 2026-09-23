@@ -6,7 +6,8 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { ToastProvider } from "@/components/Toast";
 import { MobileMenu, Sidebar } from "@/components/NavLinks";
 import SiteFooter from "@/components/SiteFooter";
-import { SojournerVeilProvider } from "@/components/brand/NavigationVeil";
+import { SojournerVeilProvider } from "@sojournerbuilds/mark/next";
+import { SojournerToken } from "@sojournerbuilds/mark/tokens";
 import CrimsonVeins from "@/components/CrimsonVeins";
 import BackgroundWarship from "@/components/BackgroundWarship";
 import CrimsonLightningBackground from "@/components/CrimsonLightningBackground";
@@ -52,8 +53,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               href="/"
               className="flex items-center gap-2 font-mono text-sm font-bold tracking-wider group"
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-sky-500/50 bg-sky-950/60 text-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.2)] transition-transform group-hover:scale-105">
-                ⚡
+              <span className="flex h-7 w-7 items-center justify-center transition-transform group-hover:scale-105">
+                <SojournerToken size={28} spinning={false} />
               </span>
               <span>
                 <span className="text-rose-500 font-bold">CRIMSON</span>{" "}

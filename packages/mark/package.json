@@ -1,0 +1,57 @@
+{
+  "name": "@sojournerbuilds/mark",
+  "version": "0.1.1",
+  "description": "Sojourner Builds waymark — nautical compass token, loading veil, and Next.js route veil.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "default": "./dist/cjs/index.js"
+    },
+    "./tokens": {
+      "types": "./dist/esm/tokens.d.ts",
+      "import": "./dist/esm/tokens.js",
+      "default": "./dist/cjs/tokens.js"
+    },
+    "./loader": {
+      "types": "./dist/esm/loader.d.ts",
+      "import": "./dist/esm/loader.js",
+      "default": "./dist/cjs/loader.js"
+    },
+    "./next": {
+      "types": "./dist/esm/next.d.ts",
+      "import": "./dist/esm/next.js",
+      "default": "./dist/cjs/next.js"
+    },
+    "./token.css": "./dist/token.css",
+    "./veil.css": "./dist/veil.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json && node scripts/copy-css.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,36 @@
+/* @sojournerbuilds/mark — veil.css
+   Plain-CSS loading veil (no Tailwind needed). The veil backdrop is
+   always dark, matching the token's locked dark theme.
+     import "@sojournerbuilds/mark/veil.css"; */
+
+.sj-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  background: rgba(5, 7, 13, 0.95);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.sj-veil-title {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: #f1f5f9;
+  text-align: center;
+}
+.sj-veil-title .sj-veil-accent {
+  color: #ff2a55;
+}
+.sj-veil-sub {
+  margin-top: 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-align: center;
+}

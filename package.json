@@ -6,7 +6,8 @@
     "node": "22.x"
   },
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "npm --workspace crimson-uplink-web run dev",
