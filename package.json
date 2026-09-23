@@ -11,7 +11,9 @@
   ],
   "scripts": {
     "dev": "npm --workspace crimson-uplink-web run dev",
-    "build": "npm --workspace crimson-uplink-web run build",
+    "build": "npm --workspace @sojournerbuilds/mark run build && npm --workspace crimson-uplink-web run build",
+    "build:mark": "npm --workspace @sojournerbuilds/mark run build",
+    "build:web": "npm --workspace crimson-uplink-web run build",
     "lint": "npm --workspace crimson-uplink-web run lint"
   },
   "optionalDependencies": {
