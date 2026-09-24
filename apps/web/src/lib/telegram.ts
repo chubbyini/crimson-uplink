@@ -62,6 +62,61 @@ function getBot(): Bot | null {
   return bot;
 }
 
+/**
+ * Bot command menu (the "/" button in Telegram clients). Registered via
+ * ensureBotCommands(), which the webhook calls on warm instances.
+ */
+export const BOT_COMMANDS = [
+  { command: "ingest", description: "Fresh run: pull sources, score ideas, send digest" },
+  { command: "topics", description: "Research topics — e.g. /topics ai, rust, GPUs" },
+  { command: "cancel", description: "Abort an active edit session" },
+  { command: "help", description: "Show help" },
+  { command: "start", description: "Start — show help" },
+];
+
+let commandsEnsured = false;
+
+/** Idempotent per instance: registers the command menu once, then no-ops. */
+export async function ensureBotCommands(): Promise<boolean> {
+  if (commandsEnsured) return true;
+  const b = getBot();
+  if (!b) return false;
+  try {
+    await b.api.setMyCommands(BOT_COMMANDS);
+    commandsEnsured = true;
+    return true;
+  } catch (e) {
+    console.error("setMyCommands failed:", e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
+/** Persistent reply keyboard: one-tap buttons, always visible above the input. */
+const MAIN_KEYBOARD = {
+  keyboard: [
+    [{ text: "🔄 Ingest" }, { text: "🔍 Topics" }],
+    [{ text: "❓ Help" }, { text: "✖ Cancel" }],
+  ],
+  resize_keyboard: true,
+  is_persistent: true,
+};
+
+/** Button-label aliases → real commands (checked before the edit session). */
+function aliasToCommand(text: string): string | null {
+  switch (text.trim()) {
+    case "🔄 Ingest":
+      return "/ingest";
+    case "🔍 Topics":
+      return "/topics";
+    case "❓ Help":
+      return "/help";
+    case "✖ Cancel":
+      return "/cancel";
+    default:
+      return null;
+  }
+}
+
 /** Top-5 digest with per-idea Approve/Skip buttons. Callback data is <64 bytes. */
 export async function sendDigest(
   chatId: string,
@@ -736,7 +791,7 @@ const HELP =
   "<b>Crimson Uplink Bot</b>\n\n" +
   "• <code>/topics ai, rust, GPUs</code> — research topics & score ideas.\n" +
   "• <code>/ingest</code> — fresh full run: pull sources, score ideas, send digest.\n" +
-  "• Morning digests arrive daily at 06:00 UTC.\n" +
+  "• Morning digests arrive daily at 6am WAT.\n" +
   "• Tap <b>✅</b> on an idea to auto-draft article + LinkedIn post.\n" +
   "• Full draft text (plain wording, no markdown) arrives in Telegram so you can read & approve.\n" +
   "• Tap <b>💼 Review LinkedIn Post</b> to approve or refine before posting.\n" +
@@ -761,9 +816,10 @@ export async function handleIncomingMessage(
   const { adminDb } = await import("./firebase-admin");
   const db = adminDb();
 
-  const send = (msg: string, parse = true) =>
+  const send = (msg: string, parse = true, keyboard = false) =>
     b.api.sendMessage(String(chatId), msg, {
       ...(parse ? { parse_mode: "HTML" as const } : {}),
+      ...(keyboard ? { reply_markup: MAIN_KEYBOARD } : {}),
     });
 
   // Which user owns this chat? (shared-bot safety)
@@ -780,6 +836,10 @@ export async function handleIncomingMessage(
     return "unknown-chat";
   }
   const uid = owners.docs[0].ref.parent.parent!.id;
+
+  // Button-label aliases → real commands. Rewritten BEFORE the edit-session
+  // check so tapping a button never lands in an AI edit prompt.
+  text = aliasToCommand(text) ?? text;
 
   // Handle /cancel
   if (text.trim().toLowerCase() === "/cancel") {
@@ -999,7 +1059,8 @@ export async function handleIncomingMessage(
   }
 
   if (!lower.startsWith("/topics")) {
-    await send(HELP);
+    // /start, /help, and anything unknown → help card + persistent buttons.
+    await send(HELP, true, true);
     return "help";
   }
 
